@@ -1027,32 +1027,46 @@
                 else if (ticket.status.includes('Cancelled')) statusClass = 'status-cancelled';
                 else if (ticket.status.includes('Missed')) statusClass = 'status-missed';
 
-                let mapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ticket.location)}`;
+                // If user is NOT admin, show anonymized public view (only service & status)
+                if (!isAdmin) {
+                    html += `
+                        <div class="ticket-card ${statusClass}">
+                            <div class="ticket-header">
+                                <div class="ticket-title"><span style="color: var(--gilded-brass);">${ticket.service}</span></div>
+                                <div class="ticket-time">${ticket.timestamp}</div>
+                            </div>
+                            <div class="ticket-details">
+                                <p><strong>Status:</strong> <span style="font-weight: 600;">${ticket.status}</span></p>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    // Full admin view with names, phone numbers, location, and control buttons
+                    let mapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ticket.location)}`;
 
-                html += `
-                    <div class="ticket-card ${statusClass}">
-                        <div class="ticket-header">
-                            <div class="ticket-title">${ticket.name} — <span style="color: var(--gilded-brass);">${ticket.service}</span></div>
-                            <div class="ticket-time">${ticket.timestamp}</div>
-                        </div>
-                        <div class="ticket-details">
-                            <p><strong>Phone:</strong> <a href="tel:${ticket.phone}" style="color: #60a5fa; text-decoration: none;">${ticket.phone}</a></p>
-                            <p><strong>Location:</strong> ${ticket.location}</p>
-                            <p><strong>Vehicle:</strong> ${ticket.vehicle}</p>
-                            ${ticket.notes ? `<p><strong>Notes:</strong> ${ticket.notes}</p>` : ''}
-                            <p><strong>Status:</strong> <span style="font-weight: 600;">${ticket.status}</span></p>
-                        </div>
-                        <div class="ticket-actions">
-                            <a href="${mapsLink}" target="_blank" class="action-btn nav-map">🗺️ Open GPS Map</a>
-                            ${isAdmin ? `
+                    html += `
+                        <div class="ticket-card ${statusClass}">
+                            <div class="ticket-header">
+                                <div class="ticket-title">${ticket.name} — <span style="color: var(--gilded-brass);">${ticket.service}</span></div>
+                                <div class="ticket-time">${ticket.timestamp}</div>
+                            </div>
+                            <div class="ticket-details">
+                                <p><strong>Phone:</strong> <a href="tel:${ticket.phone}" style="color: #60a5fa; text-decoration: none;">${ticket.phone}</a></p>
+                                <p><strong>Location:</strong> ${ticket.location}</p>
+                                <p><strong>Vehicle:</strong> ${ticket.vehicle}</p>
+                                ${ticket.notes ? `<p><strong>Notes:</strong> ${ticket.notes}</p>` : ''}
+                                <p><strong>Status:</strong> <span style="font-weight: 600;">${ticket.status}</span></p>
+                            </div>
+                            <div class="ticket-actions">
+                                <a href="${mapsLink}" target="_blank" class="action-btn nav-map">🗺️ Open GPS Map</a>
                                 <button class="action-btn" onclick="updateStatus('${ticket.id}', 'Dispatched')">⚡ Dispatched</button>
                                 <button class="action-btn" onclick="updateStatus('${ticket.id}', 'Completed')">✅ Complete</button>
                                 <button class="action-btn danger" onclick="declineTicket('${ticket.id}')">❌ Decline</button>
                                 <button class="action-btn danger" onclick="deleteTicket('${ticket.id}')">🗑️ Delete</button>
-                            ` : ''}
+                            </div>
                         </div>
-                    </div>
-                `;
+                    `;
+                }
             });
 
             queueList.innerHTML = html;
