@@ -558,8 +558,8 @@
 
     </div>
 
-    <!-- Hidden iframe for background Google Form submissions -->
-    <iframe name="hidden_iframe" id="hidden_iframe" style="display:none;" onload="if(window.submitted) { handleGoogleFormCompleted(); }"></iframe>
+    <!-- Hidden iframe for background form submissions -->
+    <iframe name="hidden_iframe" id="hidden_iframe" style="display:none;" onload="if(window.submitted) { handleFormCompleted(); }"></iframe>
 
     <!-- Footer -->
     <footer>
@@ -592,9 +592,7 @@
 
         // Background Reminder Timer Tracking
         let lastStatusChangeTime = Date.now();
-        let reminderIntervalId = null;
         let isInitialLoad = true;
-        let knownTicketIds = new Set();
 
         window.toggleAdminMode = function() {
             const requestPanel = document.getElementById('requestPanel');
@@ -790,7 +788,7 @@
             );
         };
 
-        // Handle Form Submission (Firestore + Background Google Form Backup)
+        // Handle Main Form Submission (Firestore)
         async function handleFormSubmit(event) {
             event.preventDefault();
 
@@ -818,38 +816,8 @@
             };
 
             try {
-                // 1. Primary Firestore Database Save
                 const docRef = await addDoc(collection(db, "tickets"), newTicket);
                 localStorage.setItem('vexco_my_ticket_id', docRef.id);
-
-                // 2. Background Google Form Submission Backup 
-                const googleFormUrl = "https://docs.google.com/forms/u/0/d/e/1FAIpQLSc.../formResponse"; 
-                const formElement = document.createElement('form');
-                formElement.action = googleFormUrl;
-                formElement.method = "POST";
-                formElement.target = "hidden_iframe";
-
-                const formDataMapping = {
-                    "entry.111111111": clientName,
-                    "entry.222222222": clientPhone,
-                    "entry.333333333": serviceType,
-                    "entry.444444444": locationVal,
-                    "entry.555555555": vehicleInfo,
-                    "entry.666666666": notesVal
-                };
-
-                for (const [key, val] of Object.entries(formDataMapping)) {
-                    const input = document.createElement('input');
-                    input.type = "hidden";
-                    input.name = key;
-                    input.value = val;
-                    formElement.appendChild(input);
-                }
-
-                document.body.appendChild(formElement);
-                window.submitted = true;
-                formElement.submit();
-                document.body.removeChild(formElement);
 
                 alert("Service request submitted successfully! Tracking your active request below.");
                 if (window.latestTickets) {
@@ -861,39 +829,50 @@
             }
         }
 
-        window.handleGoogleFormCompleted = function() {
-            console.log("Background Google Form submission completed successfully.");
-        };
-
-        // Log Missed Opportunity when Off Call
-        window.logMissedOpportunity = async function() {
+        // Log Missed Opportunity to Google Form in Background
+        window.logMissedOpportunity = function() {
             const name = prompt("Your Name (Optional):") || "Anonymous Driver";
+            const phone = prompt("Phone Number (Optional):") || "N/A";
             const service = prompt("What service did you need? (e.g., Jump Start, Flat Tire):") || "General Roadside Help";
+            const notes = prompt("Additional Notes / Location (Optional):") || "Logged while off-call";
+
+            const googleFormUrl = "https://docs.google.com/forms/d/e/1FAIpQLSdUnsQKyB3FDn8efF5YV2cXPk5-upvP2J16PMyQy6AiTqhQXA/formResponse"; 
             
-            const missedTicket = {
-                name: name,
-                phone: "N/A (Off-Call Log)",
-                service: `[Missed] ${service}`,
-                location: "Hot Springs Area",
-                vehicle: "Not Provided",
-                notes: "Logged while off-call to help determine peak service hours.",
-                status: 'Missed Opportunity',
-                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                createdAt: Date.now()
+            const formElement = document.createElement('form');
+            formElement.action = googleFormUrl;
+            formElement.method = "POST";
+            formElement.target = "hidden_iframe";
+
+            // Exact entry IDs extracted from pre-filled form link
+            const formDataMapping = {
+                "entry.1841487080": name,
+                "entry.233820030": phone,
+                "entry.258477849": service,
+                "entry.225083938": notes
             };
 
-            try {
-                await addDoc(collection(db, "tickets"), missedTicket);
-                
-                let currentMissed = parseInt(localStorage.getItem('vexco_shift_missed_calls') || '0', 10) + 1;
-                localStorage.setItem('vexco_shift_missed_calls', currentMissed);
-                updateMissedCallDisplay();
-
-                alert("Thank you! Your missed request has been logged. This data directly helps us optimize our operating hours.");
-            } catch (e) {
-                console.error("Error logging missed opportunity:", e);
-                alert("Error recording data. Please try again.");
+            for (const [key, val] of Object.entries(formDataMapping)) {
+                const input = document.createElement('input');
+                input.type = "hidden";
+                input.name = key;
+                input.value = val;
+                formElement.appendChild(input);
             }
+
+            document.body.appendChild(formElement);
+            window.submitted = true;
+            formElement.submit();
+            document.body.removeChild(formElement);
+
+            let currentMissed = parseInt(localStorage.getItem('vexco_shift_missed_calls') || '0', 10) + 1;
+            localStorage.setItem('vexco_shift_missed_calls', currentMissed);
+            updateMissedCallDisplay();
+
+            alert("Thank you! Your missed request has been submitted directly to the Google Form.");
+        };
+
+        window.handleFormCompleted = function() {
+            console.log("Background Google Form submission completed successfully.");
         };
 
         function updateMissedCallDisplay() {
@@ -997,10 +976,8 @@
         function notifyAdminNewCall(ticket) {
             if (!isAdmin) return;
 
-            // 1. Play audio beep tone
             playAlertBeep();
 
-            // 2. Trigger native OS desktop push notification if permitted
             if ("Notification" in window && Notification.permission === "granted") {
                 new Notification("🚨 New Vexco Roadside Dispatch!", {
                     body: `${ticket.name} requested ${ticket.service} at ${ticket.location}`,
@@ -1017,12 +994,10 @@
                 tickets.push({ id: docSnap.id, ...docSnap.data() });
             });
 
-            // Check for new incoming tickets since load to push admin notification
             if (!isInitialLoad) {
                 snapshot.docChanges().forEach((change) => {
                     if (change.type === "added") {
                         const newTicketData = change.doc.data();
-                        // Only alert if it's a pending customer service request (not missed ops or old historical ones)
                         if (newTicketData.status && newTicketData.status.startsWith('Pending')) {
                             notifyAdminNewCall(newTicketData);
                         }
@@ -1043,7 +1018,6 @@
 
             updateMissedCallDisplay();
 
-            // Filter active dispatches (Pending or Dispatched)
             const activeTickets = tickets.filter(t => t.status && (t.status.startsWith('Pending') || t.status.startsWith('Dispatched')));
             activeCountElem.textContent = activeTickets.length;
 
@@ -1053,7 +1027,6 @@
                 return;
             }
 
-            // Render Customer's Personal Ticket Tracker with Queue Position
             const myTicketId = localStorage.getItem('vexco_my_ticket_id');
             let myTicketHtml = '';
             const myTicket = tickets.find(t => t.id === myTicketId);
@@ -1063,7 +1036,6 @@
                 if (myTicket.status.includes('Completed')) statusColor = 'var(--success-green)';
                 else if (myTicket.status.includes('Declined') || myTicket.status.includes('Cancelled')) statusColor = 'var(--bauer-red)';
 
-                // Calculate exact queue position strictly among pending tickets sorted oldest-first
                 let queuePositionText = "";
                 if (myTicket.status.startsWith('Pending')) {
                     const sortedPending = tickets
@@ -1090,7 +1062,6 @@
             }
             myTicketContainer.innerHTML = myTicketHtml;
 
-            // Render Master Queue List
             let html = '';
             tickets.forEach(ticket => {
                 let statusClass = '';
@@ -1098,9 +1069,7 @@
                 else if (ticket.status.includes('Completed')) statusClass = 'status-completed';
                 else if (ticket.status.includes('Declined')) statusClass = 'status-declined';
                 else if (ticket.status.includes('Cancelled')) statusClass = 'status-cancelled';
-                else if (ticket.status.includes('Missed')) statusClass = 'status-missed';
 
-                // If user is NOT admin, show anonymized public view (only service & status)
                 if (!isAdmin) {
                     html += `
                         <div class="ticket-card ${statusClass}">
@@ -1144,7 +1113,6 @@
             queueList.innerHTML = html;
         }
 
-        // Background Status Reminder Timer Check
         function checkStatusReminders() {
             if (!isAdmin) return;
             const elapsedMinutes = (Date.now() - lastStatusChangeTime) / 60000;
