@@ -240,11 +240,11 @@
             margin-bottom: 0;
         }
 
-        /* Services & Pricing Section */
+        /* Transparent Pricing Section Header */
         .section-title {
             text-align: center;
             font-size: 2rem;
-            margin-bottom: 3rem;
+            margin-bottom: 1rem;
             font-weight: 700;
         }
 
@@ -252,11 +252,19 @@
             color: var(--gilded-brass);
         }
 
+        .pricing-intro {
+            text-align: center;
+            color: var(--text-muted);
+            max-width: 700px;
+            margin: 0 auto 2.5rem auto;
+            font-size: 1.05rem;
+        }
+
         .services-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 2rem;
-            margin-bottom: 3rem;
+            margin-bottom: 2.5rem;
         }
 
         .service-card {
@@ -290,7 +298,76 @@
         .service-card p {
             color: var(--text-muted);
             font-size: 0.95rem;
-            margin-bottom: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .service-card ul {
+            list-style-type: none;
+            padding-left: 0;
+            margin-top: 1rem;
+            border-top: 1px solid #222630;
+            padding-top: 0.75rem;
+        }
+
+        .service-card ul li {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 0.35rem;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .service-card ul li span {
+            color: var(--text-main);
+            font-weight: 600;
+        }
+
+        /* Additional Fees Panel */
+        .fees-panel {
+            background-color: var(--card-bg);
+            border: 1px solid #222630;
+            padding: 2rem;
+            border-radius: 6px;
+            margin-bottom: 3rem;
+        }
+
+        .fees-panel h3 {
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            color: var(--text-main);
+            text-align: center;
+        }
+
+        .fees-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .fee-item {
+            background-color: var(--dark-bg);
+            border: 1px solid #222630;
+            padding: 1rem;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .fee-item h4 {
+            font-size: 0.95rem;
+            color: var(--text-main);
+            margin-bottom: 0.3rem;
+        }
+
+        .fee-item .fee-price {
+            color: var(--gilded-brass);
+            font-weight: 700;
+            font-size: 1.05rem;
+        }
+
+        .fee-item p {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
         }
 
         /* Custom Service Request Section */
@@ -420,12 +497,12 @@
     <header>
         <div class="logo-text">VEXCO <span>LLC</span></div>
         
-        <!-- Desktop Nav Buttons (All unified as buttons aligned to the right) -->
+        <!-- Desktop Nav Buttons -->
         <div class="desktop-nav">
             <a href="#services" class="nav-btn">Services</a>
             <a href="#about" class="nav-btn">About</a>
             <a href="dispatch.html" class="nav-btn urgent">Dispatch App</a>
-            <a href="tel:5012502250" class="nav-btn">Call Us</a>
+            <a href="tel:5012502250" class="nav-btn">Call: 501-250-2250</a>
         </div>
 
         <!-- Mobile Menu Toggle Button (Hamburger) -->
@@ -436,7 +513,7 @@
         <!-- Mobile Dropdown Navigation -->
         <div class="mobile-menu" id="mobileMenu">
             <a href="dispatch.html" style="color: var(--bauer-red); font-weight: 700;">⚡ Dispatch App</a>
-            <a href="tel:5012502250">📞 Call Us</a>
+            <a href="tel:5012502250">📞 Call: 501-250-2250</a>
             <a href="#services" onclick="toggleMenu()">Services</a>
             <a href="#about" onclick="toggleMenu()">About</a>
         </div>
@@ -466,23 +543,60 @@
             <p>We focus strictly on core mechanical roadside services to get you back on the road safely without the runaround of a massive corporate dispatch network.</p>
         </section>
 
-        <!-- Services & Pricing Section -->
-        <h2 class="section-title" id="services">Our Services & <span>Pricing</span></h2>
+        <!-- Services & Transparent Pricing Section -->
+        <h2 class="section-title" id="services">Transparent Pricing & <span>Services</span></h2>
+        <p class="pricing-intro">No hidden fees or surprises. Every service begins with a standard base call-out fee plus the specific service rate below.</p>
         
         <div class="services-grid">
             <div class="service-card">
-                <h3>⚡ Jump Starts <span class="price">--</span></h3>
-                <p>Dead battery? We provide safe, reliable heavy-duty jump-starts to get your engine turning over.</p>
+                <h3>⚡ Jump Start <span class="price">$35.00</span></h3>
+                <p>Safe, reliable heavy-duty jump-start to get your engine turning over.</p>
+                <ul>
+                    <li>Optional Battery Testing <span>+$15.00</span></li>
+                </ul>
             </div>
 
             <div class="service-card">
-                <h3>🛞 Flat Tire Changes <span class="price">--</span></h3>
-                <p>Got a flat? We will safely swap out your disabled tire using your spare tire.</p>
+                <h3>🛞 Flat Tire Change <span class="price">$50.00</span></h3>
+                <p>Safely swap out your disabled tire using your vehicle's spare tire.</p>
+                <ul>
+                    <li>Multiple/Complex Tire Options <span>Call to Discuss</span></li>
+                </ul>
             </div>
 
             <div class="service-card">
-                <h3>🔓 Vehicle Lockouts <span class="price">--</span></h3>
-                <p>Keys locked inside your vehicle? Professional, damage-free entry tools used to get you back inside.</p>
+                <h3>🔓 Vehicle Lockouts <span class="price">$25.00</span></h3>
+                <p>Professional, damage-free entry tools used to get you back inside your vehicle quickly.</p>
+                <ul>
+                    <li>Standard Entry Service <span>Included</span></li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Additional Fees Panel -->
+        <div class="fees-panel">
+            <h3>Standard Base & Additional Fees</h3>
+            <div class="fees-grid">
+                <div class="fee-item">
+                    <h4>Base Call Out Fee</h4>
+                    <div class="fee-price">$50.00</div>
+                    <p>Standard dispatch fee for response.</p>
+                </div>
+                <div class="fee-item">
+                    <h4>Diagnostic Fee</h4>
+                    <div class="fee-price">$25.00</div>
+                    <p>General troubleshooting service.</p>
+                </div>
+                <div class="fee-item">
+                    <h4>Liner Fastening</h4>
+                    <div class="fee-price">$15.00</div>
+                    <p>Securing loose shields or liners.</p>
+                </div>
+                <div class="fee-item">
+                    <h4>Hazardous Surcharge</h4>
+                    <div class="fee-price">$35.00</div>
+                    <p>For high-risk/complex locations.</p>
+                </div>
             </div>
         </div>
 
@@ -507,7 +621,7 @@
 
     <!-- Footer -->
     <footer>
-        <p>&copy; 2026 Vexco LLC. All rights reserved. | Hot Springs, Arkansas</p>
+        <p>&copy; 2026 Vexco LLC. All rights reserved. | Hot Springs, Arkansas | Call: 501-250-2250</p>
     </footer>
 
     <!-- Simple Script to Toggle Mobile Menu -->
