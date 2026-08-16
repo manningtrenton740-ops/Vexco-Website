@@ -593,6 +593,8 @@
         // Background Reminder Timer Tracking
         let lastStatusChangeTime = Date.now();
         let reminderIntervalId = null;
+        let isInitialLoad = true;
+        let knownTicketIds = new Set();
 
         window.toggleAdminMode = function() {
             const requestPanel = document.getElementById('requestPanel');
@@ -615,6 +617,11 @@
                     dispatchGrid.classList.add('admin-mode'); 
                     queuePanel.classList.add('admin-queue-panel');
                     pageBody.classList.add('admin-mode'); // Triggers CSS to show the missed-calls badge
+
+                    // Request browser notification permissions for background alerts
+                    if ("Notification" in window && Notification.permission !== "granted") {
+                        Notification.requestPermission();
+                    }
 
                     alert("Admin access granted.");
                 } else if (pwd !== null) {
@@ -878,7 +885,6 @@
             try {
                 await addDoc(collection(db, "tickets"), missedTicket);
                 
-                // Increment Shift Missed Calls counter in localStorage
                 let currentMissed = parseInt(localStorage.getItem('vexco_shift_missed_calls') || '0', 10) + 1;
                 localStorage.setItem('vexco_shift_missed_calls', currentMissed);
                 updateMissedCallDisplay();
@@ -966,6 +972,43 @@
             }
         };
 
+        // Play Admin Alert Sound via Web Audio API
+        function playAlertBeep() {
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5 note
+                gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + 0.3);
+            } catch (e) {
+                console.error("Audio beep error:", e);
+            }
+        }
+
+        // Trigger Admin Push Notification & Alert
+        function notifyAdminNewCall(ticket) {
+            if (!isAdmin) return;
+
+            // 1. Play audio beep tone
+            playAlertBeep();
+
+            // 2. Trigger native OS desktop push notification if permitted
+            if ("Notification" in window && Notification.permission === "granted") {
+                new Notification("🚨 New Vexco Roadside Dispatch!", {
+                    body: `${ticket.name} requested ${ticket.service} at ${ticket.location}`,
+                    icon: "https://www.gstatic.com/images/icons/material/system/2x/local_shipping_black_48dp.png"
+                });
+            }
+        }
+
         // Firestore Real-Time Queue Listener
         const q = query(collection(db, "tickets"), orderBy("createdAt", "desc"));
         onSnapshot(q, (snapshot) => {
@@ -973,6 +1016,21 @@
             snapshot.forEach((docSnap) => {
                 tickets.push({ id: docSnap.id, ...docSnap.data() });
             });
+
+            // Check for new incoming tickets since load to push admin notification
+            if (!isInitialLoad) {
+                snapshot.docChanges().forEach((change) => {
+                    if (change.type === "added") {
+                        const newTicketData = change.doc.data();
+                        // Only alert if it's a pending customer service request (not missed ops or old historical ones)
+                        if (newTicketData.status && newTicketData.status.startsWith('Pending')) {
+                            notifyAdminNewCall(newTicketData);
+                        }
+                    }
+                });
+            }
+            isInitialLoad = false;
+
             window.latestTickets = tickets;
             renderQueue(tickets);
         });
@@ -1005,12 +1063,14 @@
                 if (myTicket.status.includes('Completed')) statusColor = 'var(--success-green)';
                 else if (myTicket.status.includes('Declined') || myTicket.status.includes('Cancelled')) statusColor = 'var(--bauer-red)';
 
-                // Calculate queue position among active pending/dispatched tickets (sorted by oldest first)
+                // Calculate exact queue position strictly among pending tickets sorted oldest-first
                 let queuePositionText = "";
-                if (myTicket.status.startsWith('Pending') || myTicket.status.startsWith('Dispatched')) {
-                    // Sort active tickets oldest-first for position evaluation
-                    const sortedActive = [...activeTickets].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-                    const index = sortedActive.findIndex(t => t.id === myTicket.id);
+                if (myTicket.status.startsWith('Pending')) {
+                    const sortedPending = tickets
+                        .filter(t => t.status && t.status.startsWith('Pending'))
+                        .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+                    
+                    const index = sortedPending.findIndex(t => t.id === myTicket.id);
                     if (index !== -1) {
                         queuePositionText = ` — Position #${index + 1} in Queue`;
                     }
@@ -1054,7 +1114,6 @@
                         </div>
                     `;
                 } else {
-                    // Full admin view with names, phone numbers, location, and control buttons
                     let mapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ticket.location)}`;
 
                     html += `
@@ -1085,7 +1144,7 @@
             queueList.innerHTML = html;
         }
 
-        // Background Status Reminder Timer Check (Reminds if left on Break or Available for > 30 minutes)
+        // Background Status Reminder Timer Check
         function checkStatusReminders() {
             if (!isAdmin) return;
             const elapsedMinutes = (Date.now() - lastStatusChangeTime) / 60000;
@@ -1094,7 +1153,6 @@
             }
         }
 
-        // Run reminder check every minute
         setInterval(checkStatusReminders, 60000);
     </script>
 </body>
