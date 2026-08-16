@@ -381,6 +381,8 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 0.5rem;
         }
 
         /* Ticket Item Card */
@@ -993,7 +995,7 @@
                 return;
             }
 
-            // Render Customer's Personal Ticket Tracker if saved in localStorage
+            // Render Customer's Personal Ticket Tracker with Queue Position
             const myTicketId = localStorage.getItem('vexco_my_ticket_id');
             let myTicketHtml = '';
             const myTicket = tickets.find(t => t.id === myTicketId);
@@ -1003,9 +1005,20 @@
                 if (myTicket.status.includes('Completed')) statusColor = 'var(--success-green)';
                 else if (myTicket.status.includes('Declined') || myTicket.status.includes('Cancelled')) statusColor = 'var(--bauer-red)';
 
+                // Calculate queue position among active pending/dispatched tickets (sorted by oldest first)
+                let queuePositionText = "";
+                if (myTicket.status.startsWith('Pending') || myTicket.status.startsWith('Dispatched')) {
+                    // Sort active tickets oldest-first for position evaluation
+                    const sortedActive = [...activeTickets].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+                    const index = sortedActive.findIndex(t => t.id === myTicket.id);
+                    if (index !== -1) {
+                        queuePositionText = ` — Position #${index + 1} in Queue`;
+                    }
+                }
+
                 myTicketHtml = `
                     <div class="my-ticket-banner">
-                        <h3>Your Active Request Tracker <span style="color: ${statusColor};">${myTicket.status}</span></h3>
+                        <h3>Your Active Request Tracker <span style="color: ${statusColor};">${myTicket.status}${queuePositionText}</span></h3>
                         <div class="ticket-details">
                             <p><strong>Service:</strong> ${myTicket.service}</p>
                             <p><strong>Location:</strong> ${myTicket.location}</p>
