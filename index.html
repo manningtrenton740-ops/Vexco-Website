@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vexco LLC | Hot Springs Roadside Assistance</title>
+    <style>
+        :root {
+            /* Bauer Red for urgent elements / buttons */
+            --bauer-red: #cc0000;
+            --bauer-red-dark: #990000;
+            
+            /* Gilded Brass Metallic for accent lines and branding touches */
+            --gilded-brass: #C5A059;
+            --gilded-brass-light: #dfbe7d;
+            
+            /* Deep black / dark grays */
+            --dark-bg: #0d0f12;
+            --card-bg: #161920;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            background-color: var(--dark-bg);
+            color: var(--text-main);
+            line-height: 1.6;
+        }
+
+        /* Header Navigation */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 5%;
+            background-color: var(--dark-bg);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .logo-text {
+            font-size: 1.25rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            color: var(--text-main);
+        }
+
+        .logo-text span {
+            color: var(--gilded-brass);
+        }
+
+        /* Navigation Buttons (Not a horizontal bar layout, individual explicit action buttons) */
+        .nav-buttons {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+        }
+
+        .nav-btn {
+            background-color: transparent;
+            color: var(--text-main);
+            border: 1px solid #374151;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+
+        .nav-btn:hover {
+            border-color: var(--gilded-brass);
+            color: var(--gilded-brass-light);
+        }
+
+        /* Urgent / Action buttons styled in Bauer Red */
+        .nav-btn.urgent {
+            background-color: var(--bauer-red);
+            border-color: var(--bauer-red);
+            color: var(--white, #fff);
+        }
+
+        .nav-btn.urgent:hover {
+            background-color: var(--bauer-red-dark);
+            border-color: var(--bauer-red-dark);
+        }
+
+        /* Gilded Brass Metallic Accent Divider Line */
+        .accent-divider {
+            height: 3px;
+            background: linear-gradient(90deg, var(--gilded-brass), #e2c07d, var(--gilded-brass));
+            width: 100%;
+            box-shadow: 0 0 10px rgba(197, 160, 89, 0.3);
+        }
+
+        /* Hero Section */
+        .hero {
+            position: relative;
+            padding: 6rem 5% 5rem 5%;
+            text-align: center;
+            background: linear-gradient(rgba(13, 15, 18, 0.85), rgba(13, 15, 18, 0.95)), 
+                        url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%230d0f12"/></svg>');
+            background-size: cover;
+            background-position: center;
+        }
+
+        .hero h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+
+        .hero h1 span {
+            color: var(--gilded-brass);
+        }
+
+        .hero p {
+            font-size: 1.15rem;
+            color: var(--text-muted);
+            max-width: 600px;
+            margin: 0 auto 2.5rem auto;
+        }
+
+        /* Call Now CTA Button (Bauer Red) */
+        .cta-call-now {
+            display: inline-block;
+            background-color: var(--bauer-red);
+            color: #ffffff;
+            padding: 0.9rem 2.2rem;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 1.1rem;
+            box-shadow: 0 4px 14px rgba(204, 0, 0, 0.4);
+            transition: background-color 0.2s, transform 0.1s;
+        }
+
+        .cta-call-now:hover {
+            background-color: var(--bauer-red-dark);
+            transform: translateY(-2px);
+        }
+
+        /* Main Content Layout Container */
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 4rem 5%;
+        }
+
+        /* About Section */
+        .about-section {
+            background-color: var(--card-bg);
+            border: 1px solid #222630;
+            border-left: 4px solid var(--gilded-brass);
+            padding: 2.5rem;
+            border-radius: 6px;
+            margin-bottom: 4rem;
+        }
+
+        .about-section h2 {
+            font-size: 1.75rem;
+            margin-bottom: 1rem;
+            color: var(--text-main);
+        }
+
+        .about-section p {
+            color: var(--text-muted);
+            font-size: 1.05rem;
+            line-height: 1.7;
+            margin-bottom: 1rem;
+        }
+
+        .about-section p:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Services & Pricing Section */
+        .section-title {
+            text-align: center;
+            font-size: 2rem;
+            margin-bottom: 3rem;
+            font-weight: 700;
+        }
+
+        .section-title span {
+            color: var(--gilded-brass);
+        }
+
+        .services-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .service-card {
+            background-color: var(--card-bg);
+            border: 1px solid #222630;
+            padding: 2rem;
+            border-radius: 6px;
+            position: relative;
+            transition: border-color 0.2s;
+        }
+
+        .service-card:hover {
+            border-color: var(--gilded-brass);
+        }
+
+        .service-card h3 {
+            font-size: 1.25rem;
+            margin-bottom: 0.75rem;
+            color: var(--text-main);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .service-card .price {
+            color: var(--gilded-brass);
+            font-size: 1.1rem;
+            font-weight: 700;
+        }
+
+        .service-card p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            margin-bottom: 1.5rem;
+        }
+
+        /* Scope Notice Box */
+        .notice-box {
+            background-color: rgba(197, 160, 89, 0.05);
+            border: 1px solid rgba(197, 160, 89, 0.3);
+            padding: 1.5rem;
+            border-radius: 6px;
+            text-align: center;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .notice-box h4 {
+            color: var(--gilded-brass);
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+        }
+
+        .notice-box p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 2.5rem;
+            background-color: #07080a;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            border-top: 1px solid #161920;
+        }
+
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 2.25rem; }
+            header { padding: 1rem; }
+            .nav-buttons { gap: 0.4rem; }
+            .nav-btn { padding: 0.4rem 0.75rem; font-size: 0.85rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header with individual action buttons -->
+    <header>
+        <div class="logo-text">VEXCO <span>LLC</span></div>
+        <div class="nav-buttons">
+            <a href="#services" class="nav-btn">Services</a>
+            <a href="#about" class="nav-btn">About</a>
+            <a href="dispatch.html" class="nav-btn urgent">Dispatch</a>
+            <a href="tel:5010000000" class="nav-btn urgent">Call Now</a>
+        </div>
+    </header>
+
+    <!-- Gilded Brass Metallic Accent Divider Line -->
+    <div class="accent-divider"></div>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <h1>Reliable Roadside Assistance in <span>Hot Springs</span></h1>
+        <p>Fast, professional, and straightforward help when you are stuck on the roadside.</p>
+        <a href="tel:5010000000" class="cta-call-now">Call Now for Immediate Dispatch</a>
+    </section>
+
+    <!-- Gilded Brass Metallic Accent Divider Line -->
+    <div class="accent-divider"></div>
+
+    <!-- Main Info Container -->
+    <div class="container">
+
+        <!-- About Section -->
+        <section class="about-section" id="about">
+            <h2>About Vexco LLC</h2>
+            <p>Based right here in Hot Springs, Arkansas, Vexco LLC was built to provide dependable, no-nonsense roadside assistance for local drivers. When car trouble happens, you need a quick and professional solution without the runaround.</p>
+            <p>We focus strictly on core mechanical roadside services to ensure you get back on the road safely and efficiently.</p>
+        </section>
+
+        <!-- Services & Pricing Section -->
+        <h2 class="section-title" id="services">Our Services & <span>Pricing</span></h2>
+        
+        <div class="services-grid">
+            <div class="service-card">
+                <h3>⚡ Jump Starts <span class="price">--</span></h3>
+                <p>Dead battery? We provide safe, reliable heavy-duty jump-starts to get your engine turning over immediately.</p>
+            </div>
+
+            <div class="service-card">
+                <h3>🛞 Flat Tire Changes <span class="price">--</span></h3>
+                <p>Got a flat? We will safely swap out your disabled tire using your properly inflated spare tire.</p>
+            </div>
+
+            <div class="service-card">
+                <h3>🔓 Vehicle Lockouts <span class="price">--</span></h3>
+                <p>Keys locked inside your vehicle? Professional, damage-free entry tools used to get you back inside fast.</p>
+            </div>
+        </div>
+
+        <!-- Scope Clarification Notice -->
+        <div class="notice-box">
+            <h4>Service Scope Notice</h4>
+            <p>To guarantee swift response times for our core offerings, Vexco LLC exclusively handles jump-starts, flat tire changes using spares, and vehicle lockouts. <strong>Please note that we do not offer towing services or fuel delivery.</strong></p>
+        </div>
+
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <p>&copy; 2026 Vexco LLC. All rights reserved. | Hot Springs, Arkansas</p>
+    </footer>
+
+</body>
+</html>
