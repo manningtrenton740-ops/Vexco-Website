@@ -981,7 +981,7 @@
             playAlertBeep();
 
             if ("Notification" in window && Notification.permission === "granted") {
-                new Notification("🚨 New Vexco Roadside Dispatch!", {
+                new Notification(" New Vexco Roadside Dispatch!", {
                     body: `${ticket.name} requested ${ticket.service} at ${ticket.location}`,
                     icon: "https://www.gstatic.com/images/icons/material/system/2x/local_shipping_black_48dp.png"
                 });
@@ -1129,7 +1129,7 @@
             fetch('https://ntfy.sh/vexco-dispatches-849207-secure', {
                 method: 'POST',
                 headers: {
-                    'Title': `🚨 New Dispatch: ${ticket.service}`,
+                    'Title': ` New Dispatch: ${ticket.service}`,
                     'Priority': 'urgent',
                     'Tags': 'rotating_light,car'
                 },
