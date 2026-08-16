@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vexco LLC | Live Dispatch App</title>
+    <style>
+        :root {
+            --bauer-red: #cc0000;
+            --bauer-red-dark: #990000;
+            --gilded-brass: #C5A059;
+            --gilded-brass-light: #dfbe7d;
+            --dark-bg: #0d0f12;
+            --card-bg: #161920;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --success-green: #10b981;
+            --warning-amber: #f59e0b;
+        }
+
+        html {
+            scroll-padding-top: 120px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            background-color: var(--dark-bg);
+            color: var(--text-main);
+            line-height: 1.6;
+        }
+
+        /* Header Navigation */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 5%;
+            background-color: var(--dark-bg);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            border-bottom: 1px solid #161920;
+        }
+
+        .logo-text {
+            font-size: 1.5rem;
+            font-weight: 800;
+            letter-spacing: 1.5px;
+            color: var(--text-main);
+            text-decoration: none;
+        }
+
+        .logo-text span {
+            color: var(--gilded-brass);
+        }
+
+        .desktop-nav {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+        }
+
+        .nav-btn {
+            background-color: transparent;
+            color: var(--text-main);
+            border: 1px solid #374151;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+
+        .nav-btn:hover {
+            border-color: var(--gilded-brass);
+            color: var(--gilded-brass-light);
+        }
+
+        /* Accent Divider Line */
+        .accent-divider {
+            height: 3px;
+            background: linear-gradient(90deg, var(--gilded-brass), #e2c07d, var(--gilded-brass));
+            width: 100%;
+            box-shadow: 0 0 10px rgba(197, 160, 89, 0.3);
+        }
+
+        /* App Container */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2.5rem 5%;
+        }
+
+        .app-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .app-header h1 {
+            font-size: 2rem;
+            font-weight: 800;
+        }
+
+        .app-header h1 span {
+            color: var(--gilded-brass);
+        }
+
+        .queue-stats {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .stat-badge {
+            background-color: var(--card-bg);
+            border: 1px solid #222630;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        .stat-badge span {
+            color: var(--text-main);
+            font-weight: 700;
+            margin-left: 0.25rem;
+        }
+
+        /* Dashboard Grid Layout */
+        .dispatch-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 900px) {
+            .dispatch-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Panel Styling */
+        .panel {
+            background-color: var(--card-bg);
+            border: 1px solid #222630;
+            border-radius: 6px;
+            padding: 2rem;
+        }
+
+        .panel h2 {
+            font-size: 1.25rem;
+            margin-bottom: 1.5rem;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            border-bottom: 1px solid #222630;
+            padding-bottom: 0.75rem;
+        }
+
+        /* Form Controls */
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-control {
+            width: 100%;
+            background-color: var(--dark-bg);
+            border: 1px solid #374151;
+            color: var(--text-main);
+            padding: 0.75rem 1rem;
+            border-radius: 4px;
+            font-size: 0.95rem;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--gilded-brass);
+            box-shadow: 0 0 5px rgba(197, 160, 89, 0.2);
+        }
+
+        textarea.form-control {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .dispatch-submit-btn {
+            width: 100%;
+            background-color: var(--bauer-red);
+            color: #ffffff;
+            border: none;
+            padding: 0.85rem;
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            box-shadow: 0 4px 14px rgba(204, 0, 0, 0.4);
+            transition: background-color 0.2s, transform 0.1s;
+        }
+
+        .dispatch-submit-btn:hover {
+            background-color: var(--bauer-red-dark);
+            transform: translateY(-1px);
+        }
+
+        /* Queue List Container */
+        .queue-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            max-height: 600px;
+            overflow-y: auto;
+            padding-right: 0.25rem;
+        }
+
+        .empty-queue {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 3rem 1rem;
+            font-style: italic;
+        }
+
+        /* Ticket Item Card */
+        .ticket-card {
+            background-color: var(--dark-bg);
+            border: 1px solid #222630;
+            border-left: 4px solid var(--gilded-brass);
+            border-radius: 4px;
+            padding: 1.25rem;
+            position: relative;
+            transition: border-color 0.2s;
+        }
+
+        .ticket-card.status-dispatched {
+            border-left-color: var(--warning-amber);
+        }
+
+        .ticket-card.status-completed {
+            border-left-color: var(--success-green);
+            opacity: 0.75;
+        }
+
+        .ticket-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.75rem;
+        }
+
+        .ticket-title {
+            font-weight: 700;
+            font-size: 1.05rem;
+            color: var(--text-main);
+        }
+
+        .ticket-time {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .ticket-details {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+        }
+
+        .ticket-details p {
+            margin-bottom: 0.25rem;
+        }
+
+        .ticket-details strong {
+            color: var(--text-main);
+        }
+
+        .ticket-actions {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: flex-end;
+            border-top: 1px solid #222630;
+            padding-top: 0.75rem;
+        }
+
+        .action-btn {
+            background: transparent;
+            border: 1px solid #374151;
+            color: var(--text-main);
+            padding: 0.3rem 0.75rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .action-btn:hover {
+            border-color: var(--gilded-brass);
+            color: var(--gilded-brass-light);
+        }
+
+        .action-btn.danger:hover {
+            border-color: var(--bauer-red);
+            color: var(--bauer-red);
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 2rem;
+            background-color: #07080a;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            border-top: 1px solid #161920;
+            margin-top: 4rem;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header Navigation -->
+    <header>
+        <a href="index.html" class="logo-text">VEXCO <span>LLC</span></a>
+        <div class="desktop-nav">
+            <a href="index.html" class="nav-btn">← Back to Main Site</a>
+        </div>
+    </header>
+
+    <!-- Accent Divider Line -->
+    <div class="accent-divider"></div>
+
+    <!-- App Container -->
+    <div class="container">
+        
+        <div class="app-header">
+            <h1>Live <span>Dispatch Queue</span></h1>
+            <div class="queue-stats">
+                <div class="stat-badge">Active Tickets: <span id="activeCount">0</span></div>
+            </div>
+        </div>
+
+        <div class="dispatch-grid">
+            
+            <!-- Left Panel: Create New Ticket Form -->
+            <div class="panel">
+                <h2>⚡ New Service Request</h2>
+                <form id="dispatchForm">
+                    <div class="form-group">
+                        <label for="clientName">Customer Name</label>
+                        <input type="text" id="clientName" class="form-control" placeholder="e.g., John Doe" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="clientPhone">Phone Number</label>
+                        <input type="tel" id="clientPhone" class="form-control" placeholder="e.g., 501-555-0199" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="serviceType">Service Required</label>
+                        <select id="serviceType" class="form-control" required>
+                            <option value="Jump Start ($35)">⚡ Jump Start ($35.00)</option>
+                            <option value="Flat Tire Change ($50)">🛞 Flat Tire Change ($50.00)</option>
+                            <option value="Vehicle Lockout ($25)">🔓 Vehicle Lockout ($25.00)</option>
+                            <option value="Diagnostic Troubleshooting ($25)">🔍 Diagnostic Troubleshooting ($25.00)</option>
+                            <option value="Liner Fastening ($15)">🔧 Liner Fastening ($15.00)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="location">Location / Landmark</label>
+                        <input type="text" id="location" class="form-control" placeholder="e.g., Walmart parking lot, Hot Springs" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="vehicleInfo">Vehicle Make / Model / Color</label>
+                        <input type="text" id="vehicleInfo" class="form-control" placeholder="e.g., 1999 Toyota Camry (Gold)" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="notes">Additional Notes</label>
+                        <textarea id="notes" class="form-control" placeholder="Any special details or instructions..."></textarea>
+                    </div>
+
+                    <button type="submit" class="dispatch-submit-btn">Add Ticket to Queue</button>
+                </form>
+            </div>
+
+            <!-- Right Panel: Live Queue List -->
+            <div class="panel">
+                <h2>📋 Active Queue Management</h2>
+                <div id="queueList" class="queue-list">
+                    <div class="empty-queue">Connecting to Firebase database...</div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <p>&copy; 2026 Vexco LLC Dispatch Console | Hot Springs, Arkansas</p>
+    </footer>
+
+    <!-- Firebase SDKs and Logic Script -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBXb34v7m43Xe_Rw8rQER8NsoCc2698qGY",
+            authDomain: "vexcoar.firebaseapp.com",
+            projectId: "vexcoar",
+            storageBucket: "vexcoar.firebasestorage.app",
+            messagingSenderId: "40177338166",
+            appId: "1:40177338166:web:1ce26e740838c5fa28d597",
+            measurementId: "G-E0VE1KQDXC"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Handle Form Submission
+        document.getElementById('dispatchForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            const newTicket = {
+                name: document.getElementById('clientName').value,
+                phone: document.getElementById('clientPhone').value,
+                service: document.getElementById('serviceType').value,
+                location: document.getElementById('location').value,
+                vehicle: document.getElementById('vehicleInfo').value,
+                notes: document.getElementById('notes').value,
+                status: 'Pending',
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                createdAt: Date.now()
+            };
+
+            try {
+                await addDoc(collection(db, "tickets"), newTicket);
+                document.getElementById('dispatchForm').reset();
+            } catch (e) {
+                console.error("Error adding document: ", e);
+                alert("Error adding ticket to database. Check console details.");
+            }
+        });
+
+        // Update Ticket Status
+        window.updateStatus = async function(id, newStatus) {
+            try {
+                const ticketRef = doc(db, "tickets", id);
+                await updateDoc(ticketRef, { status: newStatus });
+            } catch (e) {
+                console.error("Error updating status: ", e);
+            }
+        };
+
+        // Delete Ticket
+        window.deleteTicket = async function(id) {
+            if (confirm('Are you sure you want to remove this ticket from the queue?')) {
+                try {
+                    await deleteDoc(doc(db, "tickets", id));
+                } catch (e) {
+                    console.error("Error deleting ticket: ", e);
+                }
+            }
+        };
+
+        // Real-time Firestore Listener
+        const q = query(collection(db, "tickets"), orderBy("createdAt", "desc"));
+        onSnapshot(q, (snapshot) => {
+            let tickets = [];
+            snapshot.forEach((docSnap) => {
+                tickets.push({ id: docSnap.id, ...docSnap.data() });
+            });
+            renderQueue(tickets);
+        }, (error) => {
+            console.error("Error listening to Firestore:", error);
+            document.getElementById('queueList').innerHTML = '<div class="empty-queue" style="color: var(--bauer-red);">Database connection error. Verify Firestore rules and database creation.</div>';
+        });
+
+        function renderQueue(tickets) {
+            const container = document.getElementById('queueList');
+            const activeCountElem = document.getElementById('activeCount');
+            
+            activeCountElem.textContent = tickets.filter(t => t.status !== 'Completed').length;
+
+            if (tickets.length === 0) {
+                container.innerHTML = '<div class="empty-queue">No active dispatch requests in the queue. New submissions will appear here instantly.</div>';
+                return;
+            }
+
+            container.innerHTML = '';
+            tickets.forEach(ticket => {
+                const card = document.createElement('div');
+                card.className = `ticket-card status-${ticket.status.toLowerCase()}`;
+                
+                card.innerHTML = `
+                    <div class="ticket-header">
+                        <div class="ticket-title">${ticket.service} — <span style="color: var(--gilded-brass);">${ticket.name}</span></div>
+                        <div class="ticket-time">${ticket.timestamp}</div>
+                    </div>
+                    <div class="ticket-details">
+                        <p><strong>Phone:</strong> <a href="tel:${ticket.phone}" style="color: var(--gilded-brass-light); text-decoration: none;">${ticket.phone}</a></p>
+                        <p><strong>Location:</strong> ${ticket.location}</p>
+                        <p><strong>Vehicle:</strong> ${ticket.vehicle}</p>
+                        ${ticket.notes ? `<p><strong>Notes:</strong> ${ticket.notes}</p>` : ''}
+                        <p><strong>Status:</strong> <span style="font-weight: 600; color: ${ticket.status === 'Completed' ? 'var(--success-green)' : ticket.status === 'Dispatched' ? 'var(--warning-amber)' : 'var(--text-main)'};">${ticket.status}</span></p>
+                    </div>
+                    <div class="ticket-actions">
+                        ${ticket.status !== 'Dispatched' ? `<button class="action-btn" onclick="updateStatus('${ticket.id}', 'Dispatched')">Mark Dispatched</button>` : ''}
+                        ${ticket.status !== 'Completed' ? `<button class="action-btn" style="border-color: var(--success-green); color: var(--success-green);" onclick="updateStatus('${ticket.id}', 'Completed')">Complete</button>` : ''}
+                        <button class="action-btn danger" onclick="deleteTicket('${ticket.id}')">Delete</button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+    </script>
+</body>
+</html>
