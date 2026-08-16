@@ -87,6 +87,7 @@
         .nav-btn.admin-unlocked {
             border-color: var(--success-green);
             color: var(--success-green);
+            background-color: rgba(16, 185, 129, 0.05);
         }
 
         /* Accent Divider Line */
@@ -147,6 +148,11 @@
             display: grid;
             grid-template-columns: 1fr 2fr;
             gap: 2rem;
+            transition: all 0.3s ease;
+        }
+
+        .dispatch-grid.admin-mode {
+            grid-template-columns: 1fr; /* Form hidden, queue takes full width */
         }
 
         @media (max-width: 900px) {
@@ -161,6 +167,10 @@
             border: 1px solid #222630;
             border-radius: 6px;
             padding: 2rem;
+        }
+
+        .panel.admin-queue-panel {
+            border-color: rgba(16, 185, 129, 0.3);
         }
 
         .panel h2 {
@@ -257,7 +267,7 @@
             display: flex;
             flex-direction: column;
             gap: 1rem;
-            max-height: 600px;
+            max-height: 650px;
             overflow-y: auto;
             padding-right: 0.25rem;
         }
@@ -305,6 +315,11 @@
         .ticket-card.status-completed {
             border-left-color: var(--success-green);
             opacity: 0.75;
+        }
+
+        .ticket-card.status-declined {
+            border-left-color: var(--bauer-red);
+            opacity: 0.7;
         }
 
         .ticket-header {
@@ -414,10 +429,10 @@
             </div>
         </div>
 
-        <div class="dispatch-grid">
+        <div id="dispatchGrid" class="dispatch-grid">
             
-            <!-- Left Panel: Create New Ticket Form -->
-            <div class="panel">
+            <!-- Left Panel: Create New Ticket Form (Hidden in Admin Mode) -->
+            <div id="requestPanel" class="panel">
                 <h2>⚡ Request Roadside Service</h2>
                 <form id="dispatchForm">
                     <div class="form-group">
@@ -464,7 +479,7 @@
             </div>
 
             <!-- Right Panel: Queue List / Tracker -->
-            <div class="panel">
+            <div id="queuePanel" class="panel">
                 <h2 id="queuePanelTitle">📋 Current Workload Queue</h2>
                 <div id="myActiveTicketContainer"></div>
                 <div id="queueList" class="queue-list">
@@ -505,6 +520,10 @@
         const ADMIN_PASSWORD = "vexco2026"; 
 
         window.toggleAdminMode = function() {
+            const requestPanel = document.getElementById('requestPanel');
+            const dispatchGrid = document.getElementById('dispatchGrid');
+            const queuePanel = document.getElementById('queuePanel');
+
             if (!isAdmin) {
                 const pwd = prompt("Enter Admin Password:");
                 if (pwd === ADMIN_PASSWORD) {
@@ -512,8 +531,14 @@
                     document.getElementById('adminToggleBtn').textContent = "🔓 Admin Unlocked";
                     document.getElementById('adminToggleBtn').classList.add('admin-unlocked');
                     document.getElementById('pageTitle').innerHTML = 'Admin <span>Live Dispatch Console</span>';
-                    document.getElementById('queuePanelTitle').innerHTML = '📋 Admin Control Queue';
-                    alert("Admin access granted.");
+                    document.getElementById('queuePanelTitle').innerHTML = '📋 Admin Master Control Queue';
+                    
+                    // Hide client request form & expand queue to full width
+                    requestPanel.style.display = 'none';
+                    dispatchGrid.classList.add('admin-mode');
+                    queuePanel.classList.add('admin-queue-panel');
+
+                    alert("Admin access granted. Request form hidden.");
                 } else if (pwd !== null) {
                     alert("Incorrect password.");
                 }
@@ -523,6 +548,12 @@
                 document.getElementById('adminToggleBtn').classList.remove('admin-unlocked');
                 document.getElementById('pageTitle').innerHTML = 'Service <span>Queue Status</span>';
                 document.getElementById('queuePanelTitle').innerHTML = '📋 Current Workload Queue';
+                
+                // Restore client request form
+                requestPanel.style.display = 'block';
+                dispatchGrid.classList.remove('admin-mode');
+                queuePanel.classList.remove('admin-queue-panel');
+
                 alert("Admin access locked.");
             }
             if (window.latestTickets) {
@@ -573,7 +604,6 @@
 
             try {
                 const docRef = await addDoc(collection(db, "tickets"), newTicket);
-                // Save this specific ticket ID locally so the customer can track their own submission
                 localStorage.setItem('vexco_my_ticket_id', docRef.id);
                 document.getElementById('dispatchForm').reset();
                 alert("Service request submitted successfully! Tracking your active request below.");
@@ -596,9 +626,49 @@
             }
         };
 
+        // Admin Decline Ticket with Reason
+        window.declineTicket = async function(id) {
+            const reasonOptions = [
+                "Customer is no longer at location / Gone",
+                "Outside service range (Too far from Hot Springs)",
+                "Unable to reach customer via phone",
+                "Other custom reason"
+            ];
+
+            let choice = prompt(
+                "Select decline reason number:\n" +
+                "1. Customer is no longer at location / Gone\n" +
+                "2. Outside service range (Too far from Hot Springs)\n" +
+                "3. Unable to reach customer via phone\n" +
+                "4. Type custom reason"
+            );
+
+            if (!choice) return;
+
+            let declineReason = "";
+            if (choice === "1") declineReason = "Declined: Customer is no longer at location";
+            else if (choice === "2") declineReason = "Declined: Outside Hot Springs service range";
+            else if (choice === "3") declineReason = "Declined: Unable to reach customer by phone";
+            else if (choice === "4") {
+                declineReason = prompt("Enter custom decline reason:") || "Declined by admin";
+            } else {
+                return;
+            }
+
+            try {
+                const ticketRef = doc(db, "tickets", id);
+                await updateDoc(ticketRef, { 
+                    status: 'Declined',
+                    notes: declineReason
+                });
+            } catch (e) {
+                console.error("Error declining ticket: ", e);
+            }
+        };
+
         // Delete Ticket
         window.deleteTicket = async function(id) {
-            if (confirm('Are you sure you want to remove this ticket from the queue?')) {
+            if (confirm('Are you sure you want to permanently remove this ticket?')) {
                 try {
                     await deleteDoc(doc(db, "tickets", id));
                     if (localStorage.getItem('vexco_my_ticket_id') === id) {
@@ -629,21 +699,25 @@
             const myTrackerContainer = document.getElementById('myActiveTicketContainer');
             const activeCountElem = document.getElementById('activeCount');
             
-            activeCountElem.textContent = tickets.filter(t => t.status !== 'Completed').length;
+            activeCountElem.textContent = tickets.filter(t => t.status !== 'Completed' && t.status !== 'Declined').length;
 
-            // --- RENDER CUSTOMER'S PERSONAL TRACKER (If they submitted a ticket from this browser) ---
+            // --- RENDER CUSTOMER'S PERSONAL TRACKER ---
             const myTicketId = localStorage.getItem('vexco_my_ticket_id');
             const myTicket = tickets.find(t => t.id === myTicketId);
 
             if (myTicket && !isAdmin) {
                 let statusMessage = "Waiting in queue...";
                 let statusColor = "var(--text-main)";
+                
                 if (myTicket.status === 'Dispatched') {
-                    statusMessage = "🚀 Technician is en route!";
+                    statusMessage = "🚀 Technician is en route to your location!";
                     statusColor = "var(--warning-amber)";
                 } else if (myTicket.status === 'Completed') {
-                    statusMessage = "✅ Service completed. Thank you!";
+                    statusMessage = "✅ Service completed. Thank you for choosing Vexco!";
                     statusColor = "var(--success-green)";
+                } else if (myTicket.status === 'Declined') {
+                    statusMessage = `❌ Request Closed: ${myTicket.notes || 'Service could not be fulfilled.'}`;
+                    statusColor = "var(--bauer-red)";
                 }
 
                 myTrackerContainer.innerHTML = `
@@ -656,7 +730,7 @@
                             <p style="margin-top: 0.5rem;"><strong>Status:</strong> <span style="font-weight: 700; color: ${statusColor};">${statusMessage}</span></p>
                         </div>
                         <div style="text-align: right; margin-top: 0.5rem;">
-                            <button class="action-btn danger" onclick="deleteTicket('${myTicket.id}')">Cancel Request</button>
+                            <button class="action-btn danger" onclick="deleteTicket('${myTicket.id}')">Dismiss Tracker</button>
                         </div>
                     </div>
                 `;
@@ -675,7 +749,7 @@
                 card.className = `ticket-card status-${ticket.status.toLowerCase()}`;
                 
                 if (isAdmin) {
-                    // --- ADMIN VIEW (Full Details & Management) ---
+                    // --- ADMIN VIEW ---
                     const isCoordinates = /^-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?$/.test(ticket.location.trim());
                     const mapLinkHtml = isCoordinates 
                         ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ticket.location)}" target="_blank" class="action-btn nav-map">🗺️ Open Map</a>`
@@ -690,25 +764,27 @@
                             <p><strong>Phone:</strong> <a href="tel:${ticket.phone}" style="color: var(--gilded-brass-light); text-decoration: none;">${ticket.phone}</a></p>
                             <p><strong>Location:</strong> ${ticket.location}</p>
                             <p><strong>Vehicle:</strong> ${ticket.vehicle}</p>
-                            ${ticket.notes ? `<p><strong>Notes:</strong> ${ticket.notes}</p>` : ''}
-                            <p><strong>Status:</strong> <span style="font-weight: 600; color: ${ticket.status === 'Completed' ? 'var(--success-green)' : ticket.status === 'Dispatched' ? 'var(--warning-amber)' : 'var(--text-main)'};">${ticket.status}</span></p>
+                            ${ticket.notes ? `<p><strong>Notes/Reason:</strong> ${ticket.notes}</p>` : ''}
+                            <p><strong>Status:</strong> <span style="font-weight: 600; color: ${ticket.status === 'Completed' ? 'var(--success-green)' : ticket.status === 'Dispatched' ? 'var(--warning-amber)' : ticket.status === 'Declined' ? 'var(--bauer-red)' : 'var(--text-main)'};">${ticket.status}</span></p>
                         </div>
                         <div class="ticket-actions">
                             ${mapLinkHtml}
-                            ${ticket.status !== 'Dispatched' ? `<button class="action-btn" onclick="updateStatus('${ticket.id}', 'Dispatched')">Mark Dispatched</button>` : ''}
-                            ${ticket.status !== 'Completed' ? `<button class="action-btn" style="border-color: var(--success-green); color: var(--success-green);" onclick="updateStatus('${ticket.id}', 'Completed')">Complete</button>` : ''}
-                            <button class="action-btn danger" onclick="deleteTicket('${ticket.id}')">Delete</button>
+                            ${ticket.status !== 'Dispatched' && ticket.status !== 'Declined' && ticket.status !== 'Completed' ? `<button class="action-btn" onclick="updateStatus('${ticket.id}', 'Dispatched')">Mark Dispatched</button>` : ''}
+                            ${ticket.status !== 'Completed' && ticket.status !== 'Declined' ? `<button class="action-btn" style="border-color: var(--success-green); color: var(--success-green);" onclick="updateStatus('${ticket.id}', 'Completed')">Complete</button>` : ''}
+                            ${ticket.status !== 'Declined' && ticket.status !== 'Completed' ? `<button class="action-btn danger" onclick="declineTicket('${ticket.id}')">Decline / Cancel</button>` : ''}
+                            <button class="action-btn" style="border-color: #374151; color: var(--text-muted);" onclick="deleteTicket('${ticket.id}')">Delete</button>
                         </div>
                     `;
                 } else {
-                    // --- PUBLIC VIEW (General Workload Status Only) ---
+                    // --- PUBLIC VIEW ---
                     card.innerHTML = `
                         <div class="ticket-header">
                             <div class="ticket-title">${ticket.service}</div>
                             <div class="ticket-time">${ticket.timestamp}</div>
                         </div>
                         <div class="ticket-details">
-                            <p><strong>Status:</strong> <span style="font-weight: 600; color: ${ticket.status === 'Completed' ? 'var(--success-green)' : ticket.status === 'Dispatched' ? 'var(--warning-amber)' : 'var(--text-main)'};">${ticket.status}</span></p>
+                            <p><strong>Status:</strong> <span style="font-weight: 600; color: ${ticket.status === 'Completed' ? 'var(--success-green)' : ticket.status === 'Dispatched' ? 'var(--warning-amber)' : ticket.status === 'Declined' ? 'var(--bauer-red)' : 'var(--text-main)'};">${ticket.status}</span></p>
+                            ${ticket.status === 'Declined' && ticket.notes ? `<p style="color: var(--bauer-red); margin-top: 0.25rem;"><strong>Reason:</strong> ${ticket.notes}</p>` : ''}
                         </div>
                     `;
                 }
