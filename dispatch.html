@@ -143,6 +143,46 @@
             margin-left: 0.25rem;
         }
 
+        /* Admin Status Control Bar */
+        .admin-status-bar {
+            background: linear-gradient(135deg, #161920, #1f2430);
+            border: 1px solid var(--success-green);
+            border-radius: 6px;
+            padding: 1rem 1.5rem;
+            margin-bottom: 2rem;
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .admin-status-bar.visible {
+            display: flex;
+        }
+
+        .status-controls {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .status-btn {
+            background: transparent;
+            border: 1px solid #374151;
+            color: var(--text-muted);
+            padding: 0.4rem 0.8rem;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .status-btn.active.available { border-color: var(--success-green); color: var(--success-green); background: rgba(16, 185, 129, 0.1); }
+        .status-btn.active.break { border-color: var(--warning-amber); color: var(--warning-amber); background: rgba(245, 158, 11, 0.1); }
+        .status-btn.active.offcall { border-color: var(--bauer-red); color: var(--bauer-red); background: rgba(204, 0, 0, 0.1); }
+
         /* Dashboard Grid Layout */
         .dispatch-grid {
             display: grid;
@@ -152,7 +192,7 @@
         }
 
         .dispatch-grid.admin-mode {
-            grid-template-columns: 1fr; /* Form hidden, queue takes full width */
+            grid-template-columns: 1fr;
         }
 
         @media (max-width: 900px) {
@@ -262,6 +302,36 @@
             transform: translateY(-1px);
         }
 
+        /* Off-Call / Break Notification Banner Inside Form */
+        .status-notice-box {
+            background-color: rgba(245, 158, 11, 0.08);
+            border: 1px solid var(--warning-amber);
+            border-radius: 4px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+            color: #fde68a;
+        }
+
+        .off-call-box {
+            background-color: rgba(204, 0, 0, 0.08);
+            border: 1px solid var(--bauer-red);
+            border-radius: 4px;
+            padding: 1.5rem;
+            text-align: center;
+        }
+
+        .off-call-box h3 {
+            color: var(--bauer-red);
+            margin-bottom: 0.75rem;
+        }
+
+        .off-call-box p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-bottom: 1.25rem;
+        }
+
         /* Queue List Container */
         .queue-list {
             display: flex;
@@ -317,7 +387,9 @@
             opacity: 0.75;
         }
 
-        .ticket-card.status-declined {
+        .ticket-card.status-declined,
+        .ticket-card.status-cancelled,
+        .ticket-card.status-missed {
             border-left-color: var(--bauer-red);
             opacity: 0.7;
         }
@@ -422,6 +494,19 @@
     <!-- App Container -->
     <div class="container">
         
+        <!-- Admin Status Control Bar (Visible only when unlocked) -->
+        <div id="adminStatusBar" class="admin-status-bar">
+            <div>
+                <strong style="color: var(--text-main); display: block; font-size: 0.9rem;">Operational Status Control:</strong>
+                <span id="currentStatusDisplay" style="color: var(--success-green); font-size: 0.85rem; font-weight: 600;">🟢 Available / On Duty</span>
+            </div>
+            <div class="status-controls">
+                <button class="status-btn active available" id="btnAvailable" onclick="setOperationalStatus('Available')">🟢 Available</button>
+                <button class="status-btn break" id="btnBreak" onclick="setOperationalStatus('On Break')">🟡 On Break</button>
+                <button class="status-btn offcall" id="btnOffCall" onclick="setOperationalStatus('Off Call')">🔴 Off Call</button>
+            </div>
+        </div>
+
         <div class="app-header">
             <h1 id="pageTitle">Service <span>Queue Status</span></h1>
             <div class="queue-stats">
@@ -431,9 +516,165 @@
 
         <div id="dispatchGrid" class="dispatch-grid">
             
-            <!-- Left Panel: Create New Ticket Form (Hidden in Admin Mode) -->
+            <!-- Left Panel: Create New Ticket Form / Off-Call Panel -->
             <div id="requestPanel" class="panel">
                 <h2>⚡ Request Roadside Service</h2>
+                <div id="formContainer">
+                    <!-- Dynamic form or off-call message rendered via JS -->
+                </div>
+            </div>
+
+            <!-- Right Panel: Queue List / Tracker -->
+            <div id="queuePanel" class="panel">
+                <h2 id="queuePanelTitle">📋 Current Workload Queue</h2>
+                <div id="myActiveTicketContainer"></div>
+                <div id="queueList" class="queue-list">
+                    <div class="empty-queue">Connecting to database...</div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <p>&copy; 2026 Vexco LLC Dispatch Console | Hot Springs, Arkansas</p>
+    </footer>
+
+    <!-- Firebase SDKs and Logic Script -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBXb34v7m43Xe_Rw8rQER8NsoCc2698qGY",
+            authDomain: "vexcoar.firebaseapp.com",
+            projectId: "vexcoar",
+            storageBucket: "vexcoar.firebasestorage.app",
+            messagingSenderId: "40177338166",
+            appId: "1:40177338166:web:1ce26e740838c5fa28d597",
+            measurementId: "G-E0VE1KQDXC"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Admin State & Operational Status
+        let isAdmin = false;
+        const ADMIN_PASSWORD = "vexco2026"; 
+        let currentOperationalStatus = 'Available';
+
+        window.toggleAdminMode = function() {
+            const requestPanel = document.getElementById('requestPanel');
+            const dispatchGrid = document.getElementById('dispatchGrid');
+            const queuePanel = document.getElementById('queuePanel');
+            const adminStatusBar = document.getElementById('adminStatusBar');
+
+            if (!isAdmin) {
+                const pwd = prompt("Enter Admin Password:");
+                if (pwd === ADMIN_PASSWORD) {
+                    isAdmin = true;
+                    document.getElementById('adminToggleBtn').textContent = "🔓 Admin Unlocked";
+                    document.getElementById('adminToggleBtn').classList.add('admin-unlocked');
+                    document.getElementById('pageTitle').innerHTML = 'Admin <span>Live Dispatch Console</span>';
+                    document.getElementById('queuePanelTitle').innerHTML = '📋 Admin Master Control Queue';
+                    
+                    adminStatusBar.classList.add('visible');
+                    requestPanel.style.display = 'block'; // Keep visible in admin view so admin can preview form states
+                    dispatchGrid.classList.remove('admin-mode'); 
+                    queuePanel.classList.add('admin-queue-panel');
+
+                    alert("Admin access granted.");
+                } else if (pwd !== null) {
+                    alert("Incorrect password.");
+                }
+            } else {
+                isAdmin = false;
+                document.getElementById('adminToggleBtn').textContent = "🔒 Admin Login";
+                document.getElementById('adminToggleBtn').classList.remove('admin-unlocked');
+                document.getElementById('pageTitle').innerHTML = 'Service <span>Queue Status</span>';
+                document.getElementById('queuePanelTitle').innerHTML = '📋 Current Workload Queue';
+                
+                adminStatusBar.classList.remove('visible');
+                dispatchGrid.classList.remove('admin-mode');
+                queuePanel.classList.remove('admin-queue-panel');
+
+                alert("Admin access locked.");
+            }
+            renderRequestFormState();
+            if (window.latestTickets) {
+                renderQueue(window.latestTickets);
+            }
+        };
+
+        // Listen for Operational Status from Firebase
+        onSnapshot(doc(db, "config", "operational_status"), (docSnap) => {
+            if (docSnap.exists()) {
+                currentOperationalStatus = docSnap.data().status || 'Available';
+            } else {
+                // Initialize default if missing
+                setDoc(doc(db, "config", "operational_status"), { status: 'Available' });
+            }
+            updateStatusUIButtons();
+            renderRequestFormState();
+            if (window.latestTickets) {
+                renderQueue(window.latestTickets);
+            }
+        });
+
+        // Set Operational Status in Firestore
+        window.setOperationalStatus = async function(status) {
+            try {
+                await setDoc(doc(db, "config", "operational_status"), { status: status });
+            } catch (e) {
+                console.error("Error setting operational status:", e);
+            }
+        };
+
+        function updateStatusUIButtons() {
+            document.getElementById('btnAvailable').className = `status-btn available ${currentOperationalStatus === 'Available' ? 'active' : ''}`;
+            document.getElementById('btnBreak').className = `status-btn break ${currentOperationalStatus === 'On Break' ? 'active' : ''}`;
+            document.getElementById('btnOffCall').className = `status-btn offcall ${currentOperationalStatus === 'Off Call' ? 'active' : ''}`;
+            
+            let displayElem = document.getElementById('currentStatusDisplay');
+            if (currentOperationalStatus === 'Available') {
+                displayElem.textContent = "🟢 Available / On Duty";
+                displayElem.style.color = "var(--success-green)";
+            } else if (currentOperationalStatus === 'On Break') {
+                displayElem.textContent = "🟡 On Break (Accepting with delay notices)";
+                displayElem.style.color = "var(--warning-amber)";
+            } else if (currentOperationalStatus === 'Off Call') {
+                displayElem.textContent = "🔴 Off Call (Form locked, Missed Opportunity mode active)";
+                displayElem.style.color = "var(--bauer-red)";
+            }
+        }
+
+        // Render Request Form Based on Operational Status
+        function renderRequestFormState() {
+            const container = document.getElementById('formContainer');
+
+            if (currentOperationalStatus === 'Off Call' && !isAdmin) {
+                container.innerHTML = `
+                    <div class="off-call-box">
+                        <h3>🔴 Vexco LLC is Currently Off Call</h3>
+                        <p>We are not taking active dispatches right now. If you needed assistance, please click below to log your request. This helps us track peak demand times so we can adjust our future operating hours!</p>
+                        <button type="button" class="dispatch-submit-btn" onclick="logMissedOpportunity()">Log Missed Service Request</button>
+                    </div>
+                `;
+                return;
+            }
+
+            let noticeHtml = '';
+            if (currentOperationalStatus === 'Available') {
+                noticeHtml = `<div class="status-notice-box" style="border-color: var(--success-green); background-color: rgba(16, 185, 129, 0.05); color: #d1fae5;">ℹ️ <strong>Notice:</strong> Technician is not currently in the proper staging zone. Response might take a minute while en route.</div>`;
+            } else if (currentOperationalStatus === 'On Break') {
+                noticeHtml = `<div class="status-notice-box">⚠️ <strong>Notice:</strong> Technician is currently <strong>On Break</strong>. Service requests can still be submitted, but response times will be delayed.</div>`;
+            }
+
+            container.innerHTML = `
+                ${noticeHtml}
                 <form id="dispatchForm">
                     <div class="form-group">
                         <label for="clientName">Your Name</label>
@@ -476,90 +717,11 @@
 
                     <button type="submit" class="dispatch-submit-btn">Submit Service Request</button>
                 </form>
-            </div>
+            `;
 
-            <!-- Right Panel: Queue List / Tracker -->
-            <div id="queuePanel" class="panel">
-                <h2 id="queuePanelTitle">📋 Current Workload Queue</h2>
-                <div id="myActiveTicketContainer"></div>
-                <div id="queueList" class="queue-list">
-                    <div class="empty-queue">Connecting to database...</div>
-                </div>
-            </div>
-
-        </div>
-
-    </div>
-
-    <!-- Footer -->
-    <footer>
-        <p>&copy; 2026 Vexco LLC Dispatch Console | Hot Springs, Arkansas</p>
-    </footer>
-
-    <!-- Firebase SDKs and Logic Script -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyBXb34v7m43Xe_Rw8rQER8NsoCc2698qGY",
-            authDomain: "vexcoar.firebaseapp.com",
-            projectId: "vexcoar",
-            storageBucket: "vexcoar.firebasestorage.app",
-            messagingSenderId: "40177338166",
-            appId: "1:40177338166:web:1ce26e740838c5fa28d597",
-            measurementId: "G-E0VE1KQDXC"
-        };
-
-        // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-
-        // Admin State Tracker
-        let isAdmin = false;
-        const ADMIN_PASSWORD = "vexco2026"; 
-
-        window.toggleAdminMode = function() {
-            const requestPanel = document.getElementById('requestPanel');
-            const dispatchGrid = document.getElementById('dispatchGrid');
-            const queuePanel = document.getElementById('queuePanel');
-
-            if (!isAdmin) {
-                const pwd = prompt("Enter Admin Password:");
-                if (pwd === ADMIN_PASSWORD) {
-                    isAdmin = true;
-                    document.getElementById('adminToggleBtn').textContent = "🔓 Admin Unlocked";
-                    document.getElementById('adminToggleBtn').classList.add('admin-unlocked');
-                    document.getElementById('pageTitle').innerHTML = 'Admin <span>Live Dispatch Console</span>';
-                    document.getElementById('queuePanelTitle').innerHTML = '📋 Admin Master Control Queue';
-                    
-                    // Hide client request form & expand queue to full width
-                    requestPanel.style.display = 'none';
-                    dispatchGrid.classList.add('admin-mode');
-                    queuePanel.classList.add('admin-queue-panel');
-
-                    alert("Admin access granted. Request form hidden.");
-                } else if (pwd !== null) {
-                    alert("Incorrect password.");
-                }
-            } else {
-                isAdmin = false;
-                document.getElementById('adminToggleBtn').textContent = "🔒 Admin Login";
-                document.getElementById('adminToggleBtn').classList.remove('admin-unlocked');
-                document.getElementById('pageTitle').innerHTML = 'Service <span>Queue Status</span>';
-                document.getElementById('queuePanelTitle').innerHTML = '📋 Current Workload Queue';
-                
-                // Restore client request form
-                requestPanel.style.display = 'block';
-                dispatchGrid.classList.remove('admin-mode');
-                queuePanel.classList.remove('admin-queue-panel');
-
-                alert("Admin access locked.");
-            }
-            if (window.latestTickets) {
-                renderQueue(window.latestTickets);
-            }
-        };
+            // Re-attach event listener to the newly rendered form
+            document.getElementById('dispatchForm').addEventListener('submit', handleFormSubmit);
+        }
 
         // Geolocation Capture Function
         window.captureGPS = function() {
@@ -587,7 +749,7 @@
         };
 
         // Handle Form Submission
-        document.getElementById('dispatchForm').addEventListener('submit', async (event) => {
+        async function handleFormSubmit(event) {
             event.preventDefault();
 
             const newTicket = {
@@ -597,7 +759,7 @@
                 location: document.getElementById('location').value,
                 vehicle: document.getElementById('vehicleInfo').value,
                 notes: document.getElementById('notes').value,
-                status: 'Pending',
+                status: currentOperationalStatus === 'On Break' ? 'Pending (On Break)' : 'Pending',
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 createdAt: Date.now()
             };
@@ -605,8 +767,9 @@
             try {
                 const docRef = await addDoc(collection(db, "tickets"), newTicket);
                 localStorage.setItem('vexco_my_ticket_id', docRef.id);
-                document.getElementById('dispatchForm').reset();
-                alert("Service request submitted successfully! Tracking your active request below.");
+                alert(currentOperationalStatus === 'On Break' 
+                    ? "Service request submitted! Note: Technician is currently on break, so response time will be delayed." 
+                    : "Service request submitted successfully! Tracking your active request below.");
                 if (window.latestTickets) {
                     renderQueue(window.latestTickets);
                 }
@@ -614,7 +777,33 @@
                 console.error("Error adding document: ", e);
                 alert("Error adding ticket to database. Check console details.");
             }
-        });
+        }
+
+        // Log Missed Opportunity when Off Call
+        window.logMissedOpportunity = async function() {
+            const name = prompt("Your Name (Optional):") || "Anonymous Driver";
+            const service = prompt("What service did you need? (e.g., Jump Start, Flat Tire):") || "General Roadside Help";
+            
+            const missedTicket = {
+                name: name,
+                phone: "N/A (Off-Call Log)",
+                service: `[Missed] ${service}`,
+                location: "Hot Springs Area",
+                vehicle: "Not Provided",
+                notes: "Logged while off-call to help determine peak service hours.",
+                status: 'Missed Opportunity',
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                createdAt: Date.now()
+            };
+
+            try {
+                await addDoc(collection(db, "tickets"), missedTicket);
+                alert("Thank you! Your missed request has been logged. This data directly helps us optimize our operating hours.");
+            } catch (e) {
+                console.error("Error logging missed opportunity:", e);
+                alert("Error recording data. Please try again.");
+            }
+        };
 
         // Update Ticket Status
         window.updateStatus = async function(id, newStatus) {
@@ -626,15 +815,23 @@
             }
         };
 
+        // Customer Cancel Their Own Ticket
+        window.cancelMyRequest = async function(id) {
+            if (confirm("Are you sure you want to cancel your service request? (Select OK if another person helped you out)")) {
+                try {
+                    const ticketRef = doc(db, "tickets", id);
+                    await updateDoc(ticketRef, { 
+                        status: 'Cancelled',
+                        notes: 'Cancelled by customer (Assisted elsewhere)'
+                    });
+                } catch (e) {
+                    console.error("Error cancelling ticket: ", e);
+                }
+            }
+        };
+
         // Admin Decline Ticket with Reason
         window.declineTicket = async function(id) {
-            const reasonOptions = [
-                "Customer is no longer at location / Gone",
-                "Outside service range (Too far from Hot Springs)",
-                "Unable to reach customer via phone",
-                "Other custom reason"
-            ];
-
             let choice = prompt(
                 "Select decline reason number:\n" +
                 "1. Customer is no longer at location / Gone\n" +
@@ -699,7 +896,7 @@
             const myTrackerContainer = document.getElementById('myActiveTicketContainer');
             const activeCountElem = document.getElementById('activeCount');
             
-            activeCountElem.textContent = tickets.filter(t => t.status !== 'Completed' && t.status !== 'Declined').length;
+            activeCountElem.textContent = tickets.filter(t => t.status !== 'Completed' && t.status !== 'Declined' && t.status !== 'Cancelled' && t.status !== 'Missed Opportunity').length;
 
             // --- RENDER CUSTOMER'S PERSONAL TRACKER ---
             const myTicketId = localStorage.getItem('vexco_my_ticket_id');
@@ -708,16 +905,30 @@
             if (myTicket && !isAdmin) {
                 let statusMessage = "Waiting in queue...";
                 let statusColor = "var(--text-main)";
+                let showCancelBtn = true;
                 
                 if (myTicket.status === 'Dispatched') {
                     statusMessage = "🚀 Technician is en route to your location!";
                     statusColor = "var(--warning-amber)";
+                } else if (myTicket.status === 'Pending (On Break)') {
+                    statusMessage = "⚠️ Technician is currently on break. Expect a delayed response.";
+                    statusColor = "var(--warning-amber)";
                 } else if (myTicket.status === 'Completed') {
                     statusMessage = "✅ Service completed. Thank you for choosing Vexco!";
                     statusColor = "var(--success-green)";
+                    showCancelBtn = false;
                 } else if (myTicket.status === 'Declined') {
                     statusMessage = `❌ Request Closed: ${myTicket.notes || 'Service could not be fulfilled.'}`;
                     statusColor = "var(--bauer-red)";
+                    showCancelBtn = false;
+                } else if (myTicket.status === 'Cancelled') {
+                    statusMessage = "⚠️ You have cancelled this request.";
+                    statusColor = "var(--bauer-red)";
+                    showCancelBtn = false;
+                } else if (myTicket.status === 'Missed Opportunity') {
+                    statusMessage = "📝 Missed request logged successfully. Thank you for helping us track peak hours!";
+                    statusColor = "var(--gilded-brass)";
+                    showCancelBtn = false;
                 }
 
                 myTrackerContainer.innerHTML = `
@@ -729,8 +940,9 @@
                             <p><strong>Location:</strong> ${myTicket.location}</p>
                             <p style="margin-top: 0.5rem;"><strong>Status:</strong> <span style="font-weight: 700; color: ${statusColor};">${statusMessage}</span></p>
                         </div>
-                        <div style="text-align: right; margin-top: 0.5rem;">
-                            <button class="action-btn danger" onclick="deleteTicket('${myTicket.id}')">Dismiss Tracker</button>
+                        <div style="text-align: right; margin-top: 0.5rem; display: flex; gap: 0.5rem; justify-content: flex-end;">
+                            ${showCancelBtn ? `<button class="action-btn danger" onclick="cancelMyRequest('${myTicket.id}')">Cancel Request</button>` : ''}
+                            <button class="action-btn" style="border-color: #374151; color: var(--text-muted);" onclick="localStorage.removeItem('vexco_my_ticket_id'); renderQueue(window.latestTickets);">Dismiss Tracker</button>
                         </div>
                     </div>
                 `;
@@ -746,7 +958,7 @@
             container.innerHTML = '';
             tickets.forEach(ticket => {
                 const card = document.createElement('div');
-                card.className = `ticket-card status-${ticket.status.toLowerCase()}`;
+                card.className = `ticket-card status-${ticket.status.toLowerCase().replace(/[^a-z]/g, '')}`;
                 
                 if (isAdmin) {
                     // --- ADMIN VIEW ---
@@ -765,13 +977,13 @@
                             <p><strong>Location:</strong> ${ticket.location}</p>
                             <p><strong>Vehicle:</strong> ${ticket.vehicle}</p>
                             ${ticket.notes ? `<p><strong>Notes/Reason:</strong> ${ticket.notes}</p>` : ''}
-                            <p><strong>Status:</strong> <span style="font-weight: 600; color: ${ticket.status === 'Completed' ? 'var(--success-green)' : ticket.status === 'Dispatched' ? 'var(--warning-amber)' : ticket.status === 'Declined' ? 'var(--bauer-red)' : 'var(--text-main)'};">${ticket.status}</span></p>
+                            <p><strong>Status:</strong> <span style="font-weight: 600; color: ${ticket.status === 'Completed' ? 'var(--success-green)' : ticket.status === 'Dispatched' ? 'var(--warning-amber)' : ticket.status === 'Declined' || ticket.status === 'Cancelled' ? 'var(--bauer-red)' : ticket.status === 'Missed Opportunity' ? 'var(--gilded-brass)' : 'var(--text-main)'};">${ticket.status}</span></p>
                         </div>
                         <div class="ticket-actions">
-                            ${mapLinkHtml}
-                            ${ticket.status !== 'Dispatched' && ticket.status !== 'Declined' && ticket.status !== 'Completed' ? `<button class="action-btn" onclick="updateStatus('${ticket.id}', 'Dispatched')">Mark Dispatched</button>` : ''}
-                            ${ticket.status !== 'Completed' && ticket.status !== 'Declined' ? `<button class="action-btn" style="border-color: var(--success-green); color: var(--success-green);" onclick="updateStatus('${ticket.id}', 'Completed')">Complete</button>` : ''}
-                            ${ticket.status !== 'Declined' && ticket.status !== 'Completed' ? `<button class="action-btn danger" onclick="declineTicket('${ticket.id}')">Decline / Cancel</button>` : ''}
+                            ${ticket.status !== 'Missed Opportunity' ? mapLinkHtml : ''}
+                            ${ticket.status !== 'Dispatched' && ticket.status !== 'Declined' && ticket.status !== 'Cancelled' && ticket.status !== 'Completed' && ticket.status !== 'Missed Opportunity' ? `<button class="action-btn" onclick="updateStatus('${ticket.id}', 'Dispatched')">Mark Dispatched</button>` : ''}
+                            ${ticket.status !== 'Completed' && ticket.status !== 'Declined' && ticket.status !== 'Cancelled' && ticket.status !== 'Missed Opportunity' ? `<button class="action-btn" style="border-color: var(--success-green); color: var(--success-green);" onclick="updateStatus('${ticket.id}', 'Completed')">Complete</button>` : ''}
+                            ${ticket.status !== 'Declined' && ticket.status !== 'Cancelled' && ticket.status !== 'Completed' && ticket.status !== 'Missed Opportunity' ? `<button class="action-btn danger" onclick="declineTicket('${ticket.id}')">Decline / Cancel</button>` : ''}
                             <button class="action-btn" style="border-color: #374151; color: var(--text-muted);" onclick="deleteTicket('${ticket.id}')">Delete</button>
                         </div>
                     `;
@@ -783,8 +995,8 @@
                             <div class="ticket-time">${ticket.timestamp}</div>
                         </div>
                         <div class="ticket-details">
-                            <p><strong>Status:</strong> <span style="font-weight: 600; color: ${ticket.status === 'Completed' ? 'var(--success-green)' : ticket.status === 'Dispatched' ? 'var(--warning-amber)' : ticket.status === 'Declined' ? 'var(--bauer-red)' : 'var(--text-main)'};">${ticket.status}</span></p>
-                            ${ticket.status === 'Declined' && ticket.notes ? `<p style="color: var(--bauer-red); margin-top: 0.25rem;"><strong>Reason:</strong> ${ticket.notes}</p>` : ''}
+                            <p><strong>Status:</strong> <span style="font-weight: 600; color: ${ticket.status === 'Completed' ? 'var(--success-green)' : ticket.status === 'Dispatched' ? 'var(--warning-amber)' : ticket.status === 'Declined' || ticket.status === 'Cancelled' ? 'var(--bauer-red)' : ticket.status === 'Missed Opportunity' ? 'var(--gilded-brass)' : 'var(--text-main)'};">${ticket.status}</span></p>
+                            ${(ticket.status === 'Declined' || ticket.status === 'Cancelled') && ticket.notes ? `<p style="color: var(--bauer-red); margin-top: 0.25rem;"><strong>Details:</strong> ${ticket.notes}</p>` : ''}
                         </div>
                     `;
                 }
