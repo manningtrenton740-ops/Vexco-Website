@@ -605,14 +605,20 @@
             </div>
         </div>
 
-        <!-- Custom Service Request Section -->
+<!-- Custom Service Request Section -->
         <div class="custom-request-section">
             <h3>Looking for a Different Service?</h3>
             <p>Wish we offered something else? Let us know what roadside service you would like to see Vexco LLC support in the future.</p>
-            <form class="custom-form" onsubmit="event.preventDefault(); alert('Thank you! Your request has been noted.');">
-                <input type="text" class="custom-input" placeholder="e.g., winch-out, mobile diagnostics..." required>
+            
+            <!-- Hidden iframe to capture the form submission cleanly -->
+            <iframe name="hidden_iframe" id="hidden_iframe" style="display:none;" onload="if(window.submitted) { alert('Thank you! Your suggestion has been noted.'); document.getElementById('serviceIdeaForm').reset(); window.submitted = false; }"></iframe>
+
+            <!-- Point action to your Google Form formResponse endpoint and target the hidden iframe -->
+            <form id="serviceIdeaForm" class="custom-form" action="https://docs.google.com/forms/d/e/1FAIpQLSdexw10duzo3m5P1gaoYqBWWPc0poGHe5au7zQ3g1wiCbNeuQ/formResponse" method="POST" target="hidden_iframe" onsubmit="window.submitted=true;">
+                <input type="text" name="entry.263243028" class="custom-input" placeholder="e.g., winch-out, mobile diagnostics..." required>
                 <button type="submit" class="custom-submit-btn">Submit Idea</button>
             </form>
+
             <p class="disclaimer-note">*Please note: Submitting a request does not guarantee that Vexco LLC will offer or perform the requested service.</p>
         </div>
 
