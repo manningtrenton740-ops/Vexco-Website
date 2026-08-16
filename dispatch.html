@@ -179,7 +179,8 @@
             transition: all 0.2s;
         }
 
-        .status-btn.active.available { border-color: var(--success-green); color: var(--success-green); background: rgba(16, 185, 129, 0.1); }
+        .status-btn.active.onduty { border-color: var(--success-green); color: var(--success-green); background: rgba(16, 185, 129, 0.15); }
+        .status-btn.active.available { border-color: #3b82f6; color: #60a5fa; background: rgba(59, 130, 246, 0.1); }
         .status-btn.active.break { border-color: var(--warning-amber); color: var(--warning-amber); background: rgba(245, 158, 11, 0.1); }
         .status-btn.active.offcall { border-color: var(--bauer-red); color: var(--bauer-red); background: rgba(204, 0, 0, 0.1); }
 
@@ -302,14 +303,20 @@
             transform: translateY(-1px);
         }
 
-        /* Off-Call / Break Notification Banner Inside Form */
+        /* Notification Banners Inside Form */
         .status-notice-box {
-            background-color: rgba(245, 158, 11, 0.08);
-            border: 1px solid var(--warning-amber);
+            background-color: rgba(59, 130, 246, 0.08);
+            border: 1px solid #3b82f6;
             border-radius: 4px;
             padding: 1rem;
             margin-bottom: 1.5rem;
             font-size: 0.9rem;
+            color: #93c5fd;
+        }
+
+        .status-notice-box.break-notice {
+            background-color: rgba(245, 158, 11, 0.08);
+            border-color: var(--warning-amber);
             color: #fde68a;
         }
 
@@ -498,10 +505,11 @@
         <div id="adminStatusBar" class="admin-status-bar">
             <div>
                 <strong style="color: var(--text-main); display: block; font-size: 0.9rem;">Operational Status Control:</strong>
-                <span id="currentStatusDisplay" style="color: var(--success-green); font-size: 0.85rem; font-weight: 600;">🟢 Available / On Duty</span>
+                <span id="currentStatusDisplay" style="color: var(--success-green); font-size: 0.85rem; font-weight: 600;">🟢 On Duty</span>
             </div>
             <div class="status-controls">
-                <button class="status-btn active available" id="btnAvailable" onclick="setOperationalStatus('Available')">🟢 Available</button>
+                <button class="status-btn active onduty" id="btnOnDuty" onclick="setOperationalStatus('On Duty')">🟢 On Duty</button>
+                <button class="status-btn available" id="btnAvailable" onclick="setOperationalStatus('Available')">🔵 Available</button>
                 <button class="status-btn break" id="btnBreak" onclick="setOperationalStatus('On Break')">🟡 On Break</button>
                 <button class="status-btn offcall" id="btnOffCall" onclick="setOperationalStatus('Off Call')">🔴 Off Call</button>
             </div>
@@ -516,7 +524,7 @@
 
         <div id="dispatchGrid" class="dispatch-grid">
             
-            <!-- Left Panel: Create New Ticket Form / Off-Call Panel -->
+            <!-- Left Panel: Create New Ticket Form / Off-Call Panel (Hidden in Admin Mode) -->
             <div id="requestPanel" class="panel">
                 <h2>⚡ Request Roadside Service</h2>
                 <div id="formContainer">
@@ -545,7 +553,7 @@
     <!-- Firebase SDKs and Logic Script -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, setDoc } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBXb34v7m43Xe_Rw8rQER8NsoCc2698qGY",
@@ -564,7 +572,7 @@
         // Admin State & Operational Status
         let isAdmin = false;
         const ADMIN_PASSWORD = "vexco2026"; 
-        let currentOperationalStatus = 'Available';
+        let currentOperationalStatus = 'On Duty';
 
         window.toggleAdminMode = function() {
             const requestPanel = document.getElementById('requestPanel');
@@ -582,8 +590,8 @@
                     document.getElementById('queuePanelTitle').innerHTML = '📋 Admin Master Control Queue';
                     
                     adminStatusBar.classList.add('visible');
-                    requestPanel.style.display = 'block'; // Keep visible in admin view so admin can preview form states
-                    dispatchGrid.classList.remove('admin-mode'); 
+                    requestPanel.style.display = 'none'; // Completely hide request form when admin is logged in
+                    dispatchGrid.classList.add('admin-mode'); 
                     queuePanel.classList.add('admin-queue-panel');
 
                     alert("Admin access granted.");
@@ -598,6 +606,7 @@
                 document.getElementById('queuePanelTitle').innerHTML = '📋 Current Workload Queue';
                 
                 adminStatusBar.classList.remove('visible');
+                requestPanel.style.display = 'block'; // Show request form for customers
                 dispatchGrid.classList.remove('admin-mode');
                 queuePanel.classList.remove('admin-queue-panel');
 
@@ -612,10 +621,9 @@
         // Listen for Operational Status from Firebase
         onSnapshot(doc(db, "config", "operational_status"), (docSnap) => {
             if (docSnap.exists()) {
-                currentOperationalStatus = docSnap.data().status || 'Available';
+                currentOperationalStatus = docSnap.data().status || 'On Duty';
             } else {
-                // Initialize default if missing
-                setDoc(doc(db, "config", "operational_status"), { status: 'Available' });
+                setDoc(doc(db, "config", "operational_status"), { status: 'On Duty' });
             }
             updateStatusUIButtons();
             renderRequestFormState();
@@ -634,14 +642,18 @@
         };
 
         function updateStatusUIButtons() {
+            document.getElementById('btnOnDuty').className = `status-btn onduty ${currentOperationalStatus === 'On Duty' ? 'active' : ''}`;
             document.getElementById('btnAvailable').className = `status-btn available ${currentOperationalStatus === 'Available' ? 'active' : ''}`;
             document.getElementById('btnBreak').className = `status-btn break ${currentOperationalStatus === 'On Break' ? 'active' : ''}`;
             document.getElementById('btnOffCall').className = `status-btn offcall ${currentOperationalStatus === 'Off Call' ? 'active' : ''}`;
             
             let displayElem = document.getElementById('currentStatusDisplay');
-            if (currentOperationalStatus === 'Available') {
-                displayElem.textContent = "🟢 Available / On Duty";
+            if (currentOperationalStatus === 'On Duty') {
+                displayElem.textContent = "🟢 On Duty (In staging zone)";
                 displayElem.style.color = "var(--success-green)";
+            } else if (currentOperationalStatus === 'Available') {
+                displayElem.textContent = "🔵 Available (Outside primary staging zone)";
+                displayElem.style.color = "#60a5fa";
             } else if (currentOperationalStatus === 'On Break') {
                 displayElem.textContent = "🟡 On Break (Accepting with delay notices)";
                 displayElem.style.color = "var(--warning-amber)";
@@ -655,7 +667,7 @@
         function renderRequestFormState() {
             const container = document.getElementById('formContainer');
 
-            if (currentOperationalStatus === 'Off Call' && !isAdmin) {
+            if (currentOperationalStatus === 'Off Call') {
                 container.innerHTML = `
                     <div class="off-call-box">
                         <h3>🔴 Vexco LLC is Currently Off Call</h3>
@@ -668,9 +680,9 @@
 
             let noticeHtml = '';
             if (currentOperationalStatus === 'Available') {
-                noticeHtml = `<div class="status-notice-box" style="border-color: var(--success-green); background-color: rgba(16, 185, 129, 0.05); color: #d1fae5;">ℹ️ <strong>Notice:</strong> Technician is not currently in the proper staging zone. Response might take a minute while en route.</div>`;
+                noticeHtml = `<div class="status-notice-box">ℹ️ <strong>Notice:</strong> Technician is currently not in the proper staging zone. Response might take a minute while en route.</div>`;
             } else if (currentOperationalStatus === 'On Break') {
-                noticeHtml = `<div class="status-notice-box">⚠️ <strong>Notice:</strong> Technician is currently <strong>On Break</strong>. Service requests can still be submitted, but response times will be delayed.</div>`;
+                noticeHtml = `<div class="status-notice-box break-notice">⚠️ <strong>Notice:</strong> Technician is currently <strong>On Break</strong>. Service requests can still be submitted, but response times will be delayed.</div>`;
             }
 
             container.innerHTML = `
@@ -719,7 +731,6 @@
                 </form>
             `;
 
-            // Re-attach event listener to the newly rendered form
             document.getElementById('dispatchForm').addEventListener('submit', handleFormSubmit);
         }
 
@@ -752,6 +763,10 @@
         async function handleFormSubmit(event) {
             event.preventDefault();
 
+            let statusText = 'Pending';
+            if (currentOperationalStatus === 'On Break') statusText = 'Pending (On Break)';
+            else if (currentOperationalStatus === 'Available') statusText = 'Pending (Available - Out of Zone)';
+
             const newTicket = {
                 name: document.getElementById('clientName').value,
                 phone: document.getElementById('clientPhone').value,
@@ -759,7 +774,7 @@
                 location: document.getElementById('location').value,
                 vehicle: document.getElementById('vehicleInfo').value,
                 notes: document.getElementById('notes').value,
-                status: currentOperationalStatus === 'On Break' ? 'Pending (On Break)' : 'Pending',
+                status: statusText,
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 createdAt: Date.now()
             };
@@ -767,9 +782,7 @@
             try {
                 const docRef = await addDoc(collection(db, "tickets"), newTicket);
                 localStorage.setItem('vexco_my_ticket_id', docRef.id);
-                alert(currentOperationalStatus === 'On Break' 
-                    ? "Service request submitted! Note: Technician is currently on break, so response time will be delayed." 
-                    : "Service request submitted successfully! Tracking your active request below.");
+                alert("Service request submitted successfully! Tracking your active request below.");
                 if (window.latestTickets) {
                     renderQueue(window.latestTickets);
                 }
@@ -910,9 +923,12 @@
                 if (myTicket.status === 'Dispatched') {
                     statusMessage = "🚀 Technician is en route to your location!";
                     statusColor = "var(--warning-amber)";
-                } else if (myTicket.status === 'Pending (On Break)') {
+                } else if (myTicket.status.includes('On Break')) {
                     statusMessage = "⚠️ Technician is currently on break. Expect a delayed response.";
                     statusColor = "var(--warning-amber)";
+                } else if (myTicket.status.includes('Available')) {
+                    statusMessage = "ℹ️ Technician is en route from outside primary staging zone.";
+                    statusColor = "#60a5fa";
                 } else if (myTicket.status === 'Completed') {
                     statusMessage = "✅ Service completed. Thank you for choosing Vexco!";
                     statusColor = "var(--success-green)";
