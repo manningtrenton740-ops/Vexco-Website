@@ -819,6 +819,8 @@
                 const docRef = await addDoc(collection(db, "tickets"), newTicket);
                 localStorage.setItem('vexco_my_ticket_id', docRef.id);
 
+                sendPhoneAlert(newTicket);
+
                 alert("Service request submitted successfully! Tracking your active request below.");
                 if (window.latestTickets) {
                     renderQueue(window.latestTickets);
@@ -1122,6 +1124,18 @@
         }
 
         setInterval(checkStatusReminders, 60000);
+        // Send a push notification straight to your phone via ntfy.sh
+        function sendPhoneAlert(ticket) {
+            fetch('https://ntfy.sh/vexco-dispatches-849207-secure', {
+                method: 'POST',
+                headers: {
+                    'Title': `🚨 New Dispatch: ${ticket.service}`,
+                    'Priority': 'urgent',
+                    'Tags': 'rotating_light,car'
+                },
+                body: `Client: ${ticket.name}\nPhone: ${ticket.phone}\nLocation: ${ticket.location}\nVehicle: ${ticket.vehicle}`
+            }).catch(err => console.error("Push alert failed:", err));
+        }
     </script>
 </body>
 </html>
