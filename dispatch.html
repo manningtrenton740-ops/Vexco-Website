@@ -269,7 +269,25 @@
             font-style: italic;
         }
 
-        /* Ticket Item Card (Public & Admin Styles) */
+        /* Customer's Personal Tracker Box */
+        .my-ticket-banner {
+            background: linear-gradient(135deg, #161920, #1f2430);
+            border: 1px solid var(--gilded-brass);
+            border-radius: 6px;
+            padding: 1.25rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .my-ticket-banner h3 {
+            color: var(--gilded-brass);
+            font-size: 1.05rem;
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* Ticket Item Card */
         .ticket-card {
             background-color: var(--dark-bg);
             border: 1px solid #222630;
@@ -445,9 +463,10 @@
                 </form>
             </div>
 
-            <!-- Right Panel: Queue List (Adapts based on Public vs Admin Mode) -->
+            <!-- Right Panel: Queue List / Tracker -->
             <div class="panel">
                 <h2 id="queuePanelTitle">📋 Current Workload Queue</h2>
+                <div id="myActiveTicketContainer"></div>
                 <div id="queueList" class="queue-list">
                     <div class="empty-queue">Connecting to database...</div>
                 </div>
@@ -481,7 +500,7 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // Admin State Tracker (Password can be changed here if desired)
+        // Admin State Tracker
         let isAdmin = false;
         const ADMIN_PASSWORD = "vexco2026"; 
 
@@ -506,7 +525,6 @@
                 document.getElementById('queuePanelTitle').innerHTML = '📋 Current Workload Queue';
                 alert("Admin access locked.");
             }
-            // Re-render cached tickets in the new mode
             if (window.latestTickets) {
                 renderQueue(window.latestTickets);
             }
@@ -554,9 +572,14 @@
             };
 
             try {
-                await addDoc(collection(db, "tickets"), newTicket);
+                const docRef = await addDoc(collection(db, "tickets"), newTicket);
+                // Save this specific ticket ID locally so the customer can track their own submission
+                localStorage.setItem('vexco_my_ticket_id', docRef.id);
                 document.getElementById('dispatchForm').reset();
-                alert("Service request submitted successfully! We've received your ticket.");
+                alert("Service request submitted successfully! Tracking your active request below.");
+                if (window.latestTickets) {
+                    renderQueue(window.latestTickets);
+                }
             } catch (e) {
                 console.error("Error adding document: ", e);
                 alert("Error adding ticket to database. Check console details.");
@@ -578,6 +601,9 @@
             if (confirm('Are you sure you want to remove this ticket from the queue?')) {
                 try {
                     await deleteDoc(doc(db, "tickets", id));
+                    if (localStorage.getItem('vexco_my_ticket_id') === id) {
+                        localStorage.removeItem('vexco_my_ticket_id');
+                    }
                 } catch (e) {
                     console.error("Error deleting ticket: ", e);
                 }
@@ -591,7 +617,7 @@
             snapshot.forEach((docSnap) => {
                 tickets.push({ id: docSnap.id, ...docSnap.data() });
             });
-            window.latestTickets = tickets; // Cache for mode switching
+            window.latestTickets = tickets; 
             renderQueue(tickets);
         }, (error) => {
             console.error("Error listening to Firestore:", error);
@@ -600,9 +626,43 @@
 
         function renderQueue(tickets) {
             const container = document.getElementById('queueList');
+            const myTrackerContainer = document.getElementById('myActiveTicketContainer');
             const activeCountElem = document.getElementById('activeCount');
             
             activeCountElem.textContent = tickets.filter(t => t.status !== 'Completed').length;
+
+            // --- RENDER CUSTOMER'S PERSONAL TRACKER (If they submitted a ticket from this browser) ---
+            const myTicketId = localStorage.getItem('vexco_my_ticket_id');
+            const myTicket = tickets.find(t => t.id === myTicketId);
+
+            if (myTicket && !isAdmin) {
+                let statusMessage = "Waiting in queue...";
+                let statusColor = "var(--text-main)";
+                if (myTicket.status === 'Dispatched') {
+                    statusMessage = "🚀 Technician is en route!";
+                    statusColor = "var(--warning-amber)";
+                } else if (myTicket.status === 'Completed') {
+                    statusMessage = "✅ Service completed. Thank you!";
+                    statusColor = "var(--success-green)";
+                }
+
+                myTrackerContainer.innerHTML = `
+                    <div class="my-ticket-banner">
+                        <h3>📍 Your Active Request <span>${myTicket.timestamp}</span></h3>
+                        <div class="ticket-details">
+                            <p><strong>Service:</strong> ${myTicket.service}</p>
+                            <p><strong>Vehicle:</strong> ${myTicket.vehicle}</p>
+                            <p><strong>Location:</strong> ${myTicket.location}</p>
+                            <p style="margin-top: 0.5rem;"><strong>Status:</strong> <span style="font-weight: 700; color: ${statusColor};">${statusMessage}</span></p>
+                        </div>
+                        <div style="text-align: right; margin-top: 0.5rem;">
+                            <button class="action-btn danger" onclick="deleteTicket('${myTicket.id}')">Cancel Request</button>
+                        </div>
+                    </div>
+                `;
+            } else {
+                myTrackerContainer.innerHTML = '';
+            }
 
             if (tickets.length === 0) {
                 container.innerHTML = '<div class="empty-queue">No active service requests in the queue.</div>';
@@ -615,7 +675,7 @@
                 card.className = `ticket-card status-${ticket.status.toLowerCase()}`;
                 
                 if (isAdmin) {
-                    // --- ADMIN VIEW (Full Details, Map Navigation & Management Controls) ---
+                    // --- ADMIN VIEW (Full Details & Management) ---
                     const isCoordinates = /^-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?$/.test(ticket.location.trim());
                     const mapLinkHtml = isCoordinates 
                         ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ticket.location)}" target="_blank" class="action-btn nav-map">🗺️ Open Map</a>`
@@ -641,7 +701,7 @@
                         </div>
                     `;
                 } else {
-                    // --- PUBLIC VIEW (Vague, Privacy-Safe Workload Status Only) ---
+                    // --- PUBLIC VIEW (General Workload Status Only) ---
                     card.innerHTML = `
                         <div class="ticket-header">
                             <div class="ticket-title">${ticket.service}</div>
