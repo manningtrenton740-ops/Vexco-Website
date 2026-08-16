@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vexco LLC | Live Dispatch App</title>
+    <title>Vexco LLC | Dispatch & Service Queue</title>
     <style>
         :root {
             --bauer-red: #cc0000;
@@ -76,11 +76,17 @@
             font-weight: 600;
             font-size: 0.9rem;
             transition: all 0.2s ease;
+            cursor: pointer;
         }
 
         .nav-btn:hover {
             border-color: var(--gilded-brass);
             color: var(--gilded-brass-light);
+        }
+
+        .nav-btn.admin-unlocked {
+            border-color: var(--success-green);
+            color: var(--success-green);
         }
 
         /* Accent Divider Line */
@@ -204,6 +210,29 @@
             min-height: 80px;
         }
 
+        .location-input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .gps-btn {
+            background-color: rgba(197, 160, 89, 0.1);
+            border: 1px solid var(--gilded-brass);
+            color: var(--gilded-brass-light);
+            padding: 0.5rem;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            text-align: center;
+        }
+
+        .gps-btn:hover {
+            background-color: rgba(197, 160, 89, 0.2);
+        }
+
         .dispatch-submit-btn {
             width: 100%;
             background-color: var(--bauer-red);
@@ -240,7 +269,7 @@
             font-style: italic;
         }
 
-        /* Ticket Item Card */
+        /* Ticket Item Card (Public & Admin Styles) */
         .ticket-card {
             background-color: var(--dark-bg);
             border: 1px solid #222630;
@@ -298,6 +327,7 @@
             justify-content: flex-end;
             border-top: 1px solid #222630;
             padding-top: 0.75rem;
+            flex-wrap: wrap;
         }
 
         .action-btn {
@@ -310,11 +340,19 @@
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s;
+            text-decoration: none;
+            display: inline-block;
         }
 
         .action-btn:hover {
             border-color: var(--gilded-brass);
             color: var(--gilded-brass-light);
+        }
+
+        .action-btn.nav-map {
+            border-color: var(--gilded-brass);
+            color: var(--gilded-brass-light);
+            background-color: rgba(197, 160, 89, 0.05);
         }
 
         .action-btn.danger:hover {
@@ -341,6 +379,7 @@
         <a href="index.html" class="logo-text">VEXCO <span>LLC</span></a>
         <div class="desktop-nav">
             <a href="index.html" class="nav-btn">← Back to Main Site</a>
+            <button id="adminToggleBtn" class="nav-btn" onclick="toggleAdminMode()">🔒 Admin Login</button>
         </div>
     </header>
 
@@ -351,9 +390,9 @@
     <div class="container">
         
         <div class="app-header">
-            <h1>Live <span>Dispatch Queue</span></h1>
+            <h1 id="pageTitle">Service <span>Queue Status</span></h1>
             <div class="queue-stats">
-                <div class="stat-badge">Active Tickets: <span id="activeCount">0</span></div>
+                <div class="stat-badge">Active Dispatches: <span id="activeCount">0</span></div>
             </div>
         </div>
 
@@ -361,10 +400,10 @@
             
             <!-- Left Panel: Create New Ticket Form -->
             <div class="panel">
-                <h2>⚡ New Service Request</h2>
+                <h2>⚡ Request Roadside Service</h2>
                 <form id="dispatchForm">
                     <div class="form-group">
-                        <label for="clientName">Customer Name</label>
+                        <label for="clientName">Your Name</label>
                         <input type="text" id="clientName" class="form-control" placeholder="e.g., John Doe" required>
                     </div>
 
@@ -385,8 +424,11 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="location">Location / Landmark</label>
-                        <input type="text" id="location" class="form-control" placeholder="e.g., Walmart parking lot, Hot Springs" required>
+                        <label for="location">Location / GPS Coordinates</label>
+                        <div class="location-input-group">
+                            <button type="button" class="gps-btn" onclick="captureGPS()">📍 Use Current GPS Location</button>
+                            <input type="text" id="location" class="form-control" placeholder="e.g., 34.5199, -93.0508 or Walmart Parking Lot" required>
+                        </div>
                     </div>
 
                     <div class="form-group">
@@ -395,19 +437,19 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="notes">Additional Notes</label>
-                        <textarea id="notes" class="form-control" placeholder="Any special details or instructions..."></textarea>
+                        <label for="notes">Additional Notes / Landmarks</label>
+                        <textarea id="notes" class="form-control" placeholder="Any special details or landmarks..."></textarea>
                     </div>
 
-                    <button type="submit" class="dispatch-submit-btn">Add Ticket to Queue</button>
+                    <button type="submit" class="dispatch-submit-btn">Submit Service Request</button>
                 </form>
             </div>
 
-            <!-- Right Panel: Live Queue List -->
+            <!-- Right Panel: Queue List (Adapts based on Public vs Admin Mode) -->
             <div class="panel">
-                <h2>📋 Active Queue Management</h2>
+                <h2 id="queuePanelTitle">📋 Current Workload Queue</h2>
                 <div id="queueList" class="queue-list">
-                    <div class="empty-queue">Connecting to Firebase database...</div>
+                    <div class="empty-queue">Connecting to database...</div>
                 </div>
             </div>
 
@@ -439,6 +481,62 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
+        // Admin State Tracker (Password can be changed here if desired)
+        let isAdmin = false;
+        const ADMIN_PASSWORD = "vexco2026"; 
+
+        window.toggleAdminMode = function() {
+            if (!isAdmin) {
+                const pwd = prompt("Enter Admin Password:");
+                if (pwd === ADMIN_PASSWORD) {
+                    isAdmin = true;
+                    document.getElementById('adminToggleBtn').textContent = "🔓 Admin Unlocked";
+                    document.getElementById('adminToggleBtn').classList.add('admin-unlocked');
+                    document.getElementById('pageTitle').innerHTML = 'Admin <span>Live Dispatch Console</span>';
+                    document.getElementById('queuePanelTitle').innerHTML = '📋 Admin Control Queue';
+                    alert("Admin access granted.");
+                } else if (pwd !== null) {
+                    alert("Incorrect password.");
+                }
+            } else {
+                isAdmin = false;
+                document.getElementById('adminToggleBtn').textContent = "🔒 Admin Login";
+                document.getElementById('adminToggleBtn').classList.remove('admin-unlocked');
+                document.getElementById('pageTitle').innerHTML = 'Service <span>Queue Status</span>';
+                document.getElementById('queuePanelTitle').innerHTML = '📋 Current Workload Queue';
+                alert("Admin access locked.");
+            }
+            // Re-render cached tickets in the new mode
+            if (window.latestTickets) {
+                renderQueue(window.latestTickets);
+            }
+        };
+
+        // Geolocation Capture Function
+        window.captureGPS = function() {
+            const locationInput = document.getElementById('location');
+            if (!navigator.geolocation) {
+                alert("Geolocation is not supported by your browser.");
+                return;
+            }
+
+            locationInput.value = "Acquiring GPS coordinates...";
+            
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const lat = position.coords.latitude.toFixed(6);
+                    const lng = position.coords.longitude.toFixed(6);
+                    locationInput.value = `${lat}, ${lng}`;
+                },
+                (error) => {
+                    console.error("GPS Error:", error);
+                    alert("Unable to retrieve your location. Please enter it manually or check permissions.");
+                    locationInput.value = "";
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
+        };
+
         // Handle Form Submission
         document.getElementById('dispatchForm').addEventListener('submit', async (event) => {
             event.preventDefault();
@@ -458,6 +556,7 @@
             try {
                 await addDoc(collection(db, "tickets"), newTicket);
                 document.getElementById('dispatchForm').reset();
+                alert("Service request submitted successfully! We've received your ticket.");
             } catch (e) {
                 console.error("Error adding document: ", e);
                 alert("Error adding ticket to database. Check console details.");
@@ -492,6 +591,7 @@
             snapshot.forEach((docSnap) => {
                 tickets.push({ id: docSnap.id, ...docSnap.data() });
             });
+            window.latestTickets = tickets; // Cache for mode switching
             renderQueue(tickets);
         }, (error) => {
             console.error("Error listening to Firestore:", error);
@@ -505,7 +605,7 @@
             activeCountElem.textContent = tickets.filter(t => t.status !== 'Completed').length;
 
             if (tickets.length === 0) {
-                container.innerHTML = '<div class="empty-queue">No active dispatch requests in the queue. New submissions will appear here instantly.</div>';
+                container.innerHTML = '<div class="empty-queue">No active service requests in the queue.</div>';
                 return;
             }
 
@@ -514,24 +614,45 @@
                 const card = document.createElement('div');
                 card.className = `ticket-card status-${ticket.status.toLowerCase()}`;
                 
-                card.innerHTML = `
-                    <div class="ticket-header">
-                        <div class="ticket-title">${ticket.service} — <span style="color: var(--gilded-brass);">${ticket.name}</span></div>
-                        <div class="ticket-time">${ticket.timestamp}</div>
-                    </div>
-                    <div class="ticket-details">
-                        <p><strong>Phone:</strong> <a href="tel:${ticket.phone}" style="color: var(--gilded-brass-light); text-decoration: none;">${ticket.phone}</a></p>
-                        <p><strong>Location:</strong> ${ticket.location}</p>
-                        <p><strong>Vehicle:</strong> ${ticket.vehicle}</p>
-                        ${ticket.notes ? `<p><strong>Notes:</strong> ${ticket.notes}</p>` : ''}
-                        <p><strong>Status:</strong> <span style="font-weight: 600; color: ${ticket.status === 'Completed' ? 'var(--success-green)' : ticket.status === 'Dispatched' ? 'var(--warning-amber)' : 'var(--text-main)'};">${ticket.status}</span></p>
-                    </div>
-                    <div class="ticket-actions">
-                        ${ticket.status !== 'Dispatched' ? `<button class="action-btn" onclick="updateStatus('${ticket.id}', 'Dispatched')">Mark Dispatched</button>` : ''}
-                        ${ticket.status !== 'Completed' ? `<button class="action-btn" style="border-color: var(--success-green); color: var(--success-green);" onclick="updateStatus('${ticket.id}', 'Completed')">Complete</button>` : ''}
-                        <button class="action-btn danger" onclick="deleteTicket('${ticket.id}')">Delete</button>
-                    </div>
-                `;
+                if (isAdmin) {
+                    // --- ADMIN VIEW (Full Details, Map Navigation & Management Controls) ---
+                    const isCoordinates = /^-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?$/.test(ticket.location.trim());
+                    const mapLinkHtml = isCoordinates 
+                        ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ticket.location)}" target="_blank" class="action-btn nav-map">🗺️ Open Map</a>`
+                        : `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ticket.location + ' Hot Springs AR')}" target="_blank" class="action-btn nav-map">🗺️ Search Map</a>`;
+
+                    card.innerHTML = `
+                        <div class="ticket-header">
+                            <div class="ticket-title">${ticket.service} — <span style="color: var(--gilded-brass);">${ticket.name}</span></div>
+                            <div class="ticket-time">${ticket.timestamp}</div>
+                        </div>
+                        <div class="ticket-details">
+                            <p><strong>Phone:</strong> <a href="tel:${ticket.phone}" style="color: var(--gilded-brass-light); text-decoration: none;">${ticket.phone}</a></p>
+                            <p><strong>Location:</strong> ${ticket.location}</p>
+                            <p><strong>Vehicle:</strong> ${ticket.vehicle}</p>
+                            ${ticket.notes ? `<p><strong>Notes:</strong> ${ticket.notes}</p>` : ''}
+                            <p><strong>Status:</strong> <span style="font-weight: 600; color: ${ticket.status === 'Completed' ? 'var(--success-green)' : ticket.status === 'Dispatched' ? 'var(--warning-amber)' : 'var(--text-main)'};">${ticket.status}</span></p>
+                        </div>
+                        <div class="ticket-actions">
+                            ${mapLinkHtml}
+                            ${ticket.status !== 'Dispatched' ? `<button class="action-btn" onclick="updateStatus('${ticket.id}', 'Dispatched')">Mark Dispatched</button>` : ''}
+                            ${ticket.status !== 'Completed' ? `<button class="action-btn" style="border-color: var(--success-green); color: var(--success-green);" onclick="updateStatus('${ticket.id}', 'Completed')">Complete</button>` : ''}
+                            <button class="action-btn danger" onclick="deleteTicket('${ticket.id}')">Delete</button>
+                        </div>
+                    `;
+                } else {
+                    // --- PUBLIC VIEW (Vague, Privacy-Safe Workload Status Only) ---
+                    card.innerHTML = `
+                        <div class="ticket-header">
+                            <div class="ticket-title">${ticket.service}</div>
+                            <div class="ticket-time">${ticket.timestamp}</div>
+                        </div>
+                        <div class="ticket-details">
+                            <p><strong>Status:</strong> <span style="font-weight: 600; color: ${ticket.status === 'Completed' ? 'var(--success-green)' : ticket.status === 'Dispatched' ? 'var(--warning-amber)' : 'var(--text-main)'};">${ticket.status}</span></p>
+                        </div>
+                    `;
+                }
+
                 container.appendChild(card);
             });
         }
