@@ -904,6 +904,18 @@
             }
         };
 
+        // Delete Ticket From Firestore (Admin Only)
+        window.deleteTicket = async function(id) {
+            if (confirm("Permanently delete this service request from the database?")) {
+                try {
+                    await deleteDoc(doc(db, "tickets", id));
+                } catch (e) {
+                    console.error("Error deleting ticket:", e);
+                    alert("Error deleting ticket from database.");
+                }
+            }
+        };
+
         // Customer Cancel Their Own Ticket
         window.cancelMyRequest = async function(id) {
             if (confirm("Are you sure you want to cancel your service request? (Select OK if another person helped you out)")) {
@@ -1033,9 +1045,10 @@
                         <div class="ticket-actions">
                             <a href="${mapsLink}" target="_blank" class="action-btn nav-map">🗺️ Open GPS Map</a>
                             ${isAdmin ? `
-                                <button class="action-btn" onclick="updateStatus('${ticket.id}', 'Dispatched')">⚡ Set Dispatched</button>
+                                <button class="action-btn" onclick="updateStatus('${ticket.id}', 'Dispatched')">⚡ Dispatched</button>
                                 <button class="action-btn" onclick="updateStatus('${ticket.id}', 'Completed')">✅ Complete</button>
                                 <button class="action-btn danger" onclick="declineTicket('${ticket.id}')">❌ Decline</button>
+                                <button class="action-btn danger" onclick="deleteTicket('${ticket.id}')">🗑️ Delete</button>
                             ` : ''}
                         </div>
                     </div>
