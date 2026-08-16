@@ -144,6 +144,14 @@
             margin-left: 0.25rem;
         }
 
+        /* Admin-only stat badge */
+        .admin-stat-only {
+            display: none;
+        }
+        .admin-mode .admin-stat-only {
+            display: inline-block;
+        }
+
         /* Admin Status Control Bar */
         .admin-status-bar {
             background: linear-gradient(135deg, #161920, #1f2430);
@@ -485,7 +493,7 @@
         }
     </style>
 </head>
-<body>
+<body id="pageBody">
 
     <!-- Header Navigation -->
     <header>
@@ -520,7 +528,8 @@
             <h1 id="pageTitle">Service <span>Queue Status</span></h1>
             <div class="queue-stats">
                 <div class="stat-badge">Active Dispatches: <span id="activeCount">0</span></div>
-                <div class="stat-badge">Shift Missed Calls: <span id="missedCallCount">0</span></div>
+                <!-- Hidden from regular customers, visible only in admin mode -->
+                <div class="stat-badge admin-stat-only">Shift Missed Calls: <span id="missedCallCount">0</span></div>
             </div>
         </div>
 
@@ -588,6 +597,7 @@
             const dispatchGrid = document.getElementById('dispatchGrid');
             const queuePanel = document.getElementById('queuePanel');
             const adminStatusBar = document.getElementById('adminStatusBar');
+            const pageBody = document.getElementById('pageBody');
 
             if (!isAdmin) {
                 const pwd = prompt("Enter Admin Password:");
@@ -602,6 +612,7 @@
                     requestPanel.style.display = 'none'; // Completely hide request form when admin is logged in
                     dispatchGrid.classList.add('admin-mode'); 
                     queuePanel.classList.add('admin-queue-panel');
+                    pageBody.classList.add('admin-mode'); // Triggers CSS to show the missed-calls badge
 
                     alert("Admin access granted.");
                 } else if (pwd !== null) {
@@ -618,6 +629,7 @@
                 requestPanel.style.display = 'block'; // Show request form for customers
                 dispatchGrid.classList.remove('admin-mode');
                 queuePanel.classList.remove('admin-queue-panel');
+                pageBody.classList.remove('admin-mode'); // Hides the missed-calls badge from customer view
 
                 alert("Admin access locked.");
             }
@@ -802,7 +814,6 @@
                 localStorage.setItem('vexco_my_ticket_id', docRef.id);
 
                 // 2. Background Google Form Submission Backup 
-                // (Replace entry.XXXXX IDs with your actual Google Form entry IDs if needed)
                 const googleFormUrl = "https://docs.google.com/forms/u/0/d/e/1FAIpQLSc.../formResponse"; 
                 const formElement = document.createElement('form');
                 formElement.action = googleFormUrl;
