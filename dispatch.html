@@ -126,6 +126,7 @@
         .queue-stats {
             display: flex;
             gap: 1rem;
+            flex-wrap: wrap;
         }
 
         .stat-badge {
@@ -519,6 +520,7 @@
             <h1 id="pageTitle">Service <span>Queue Status</span></h1>
             <div class="queue-stats">
                 <div class="stat-badge">Active Dispatches: <span id="activeCount">0</span></div>
+                <div class="stat-badge">Shift Missed Calls: <span id="missedCallCount">0</span></div>
             </div>
         </div>
 
@@ -544,6 +546,9 @@
         </div>
 
     </div>
+
+    <!-- Hidden iframe for background Google Form submissions -->
+    <iframe name="hidden_iframe" id="hidden_iframe" style="display:none;" onload="if(window.submitted) { handleGoogleFormCompleted(); }"></iframe>
 
     <!-- Footer -->
     <footer>
@@ -573,6 +578,10 @@
         let isAdmin = false;
         const ADMIN_PASSWORD = "vexco2026"; 
         let currentOperationalStatus = 'On Duty';
+
+        // Background Reminder Timer Tracking
+        let lastStatusChangeTime = Date.now();
+        let reminderIntervalId = null;
 
         window.toggleAdminMode = function() {
             const requestPanel = document.getElementById('requestPanel');
@@ -625,6 +634,7 @@
             } else {
                 setDoc(doc(db, "config", "operational_status"), { status: 'On Duty' });
             }
+            lastStatusChangeTime = Date.now(); // Reset reminder timer on status change
             updateStatusUIButtons();
             renderRequestFormState();
             if (window.latestTickets) {
@@ -759,7 +769,7 @@
             );
         };
 
-        // Handle Form Submission
+        // Handle Form Submission (Firestore + Background Google Form Backup)
         async function handleFormSubmit(event) {
             event.preventDefault();
 
@@ -767,21 +777,60 @@
             if (currentOperationalStatus === 'On Break') statusText = 'Pending (On Break)';
             else if (currentOperationalStatus === 'Available') statusText = 'Pending (Available - Out of Zone)';
 
+            const clientName = document.getElementById('clientName').value;
+            const clientPhone = document.getElementById('clientPhone').value;
+            const serviceType = document.getElementById('serviceType').value;
+            const locationVal = document.getElementById('location').value;
+            const vehicleInfo = document.getElementById('vehicleInfo').value;
+            const notesVal = document.getElementById('notes').value;
+
             const newTicket = {
-                name: document.getElementById('clientName').value,
-                phone: document.getElementById('clientPhone').value,
-                service: document.getElementById('serviceType').value,
-                location: document.getElementById('location').value,
-                vehicle: document.getElementById('vehicleInfo').value,
-                notes: document.getElementById('notes').value,
+                name: clientName,
+                phone: clientPhone,
+                service: serviceType,
+                location: locationVal,
+                vehicle: vehicleInfo,
+                notes: notesVal,
                 status: statusText,
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 createdAt: Date.now()
             };
 
             try {
+                // 1. Primary Firestore Database Save
                 const docRef = await addDoc(collection(db, "tickets"), newTicket);
                 localStorage.setItem('vexco_my_ticket_id', docRef.id);
+
+                // 2. Background Google Form Submission Backup 
+                // (Replace entry.XXXXX IDs with your actual Google Form entry IDs if needed)
+                const googleFormUrl = "https://docs.google.com/forms/u/0/d/e/1FAIpQLSc.../formResponse"; 
+                const formElement = document.createElement('form');
+                formElement.action = googleFormUrl;
+                formElement.method = "POST";
+                formElement.target = "hidden_iframe";
+
+                const formDataMapping = {
+                    "entry.111111111": clientName,
+                    "entry.222222222": clientPhone,
+                    "entry.333333333": serviceType,
+                    "entry.444444444": locationVal,
+                    "entry.555555555": vehicleInfo,
+                    "entry.666666666": notesVal
+                };
+
+                for (const [key, val] of Object.entries(formDataMapping)) {
+                    const input = document.createElement('input');
+                    input.type = "hidden";
+                    input.name = key;
+                    input.value = val;
+                    formElement.appendChild(input);
+                }
+
+                document.body.appendChild(formElement);
+                window.submitted = true;
+                formElement.submit();
+                document.body.removeChild(formElement);
+
                 alert("Service request submitted successfully! Tracking your active request below.");
                 if (window.latestTickets) {
                     renderQueue(window.latestTickets);
@@ -791,6 +840,10 @@
                 alert("Error adding ticket to database. Check console details.");
             }
         }
+
+        window.handleGoogleFormCompleted = function() {
+            console.log("Background Google Form submission completed successfully.");
+        };
 
         // Log Missed Opportunity when Off Call
         window.logMissedOpportunity = async function() {
@@ -811,12 +864,24 @@
 
             try {
                 await addDoc(collection(db, "tickets"), missedTicket);
+                
+                // Increment Shift Missed Calls counter in localStorage
+                let currentMissed = parseInt(localStorage.getItem('vexco_shift_missed_calls') || '0', 10) + 1;
+                localStorage.setItem('vexco_shift_missed_calls', currentMissed);
+                updateMissedCallDisplay();
+
                 alert("Thank you! Your missed request has been logged. This data directly helps us optimize our operating hours.");
             } catch (e) {
                 console.error("Error logging missed opportunity:", e);
                 alert("Error recording data. Please try again.");
             }
         };
+
+        function updateMissedCallDisplay() {
+            const count = localStorage.getItem('vexco_shift_missed_calls') || '0';
+            const badge = document.getElementById('missedCallCount');
+            if (badge) badge.textContent = count;
+        }
 
         // Update Ticket Status
         window.updateStatus = async function(id, newStatus) {
@@ -872,154 +937,114 @@
                     notes: declineReason
                 });
             } catch (e) {
-                console.error("Error declining ticket: ", e);
+                console.error("Error declining ticket:", e);
             }
         };
 
-        // Delete Ticket
-        window.deleteTicket = async function(id) {
-            if (confirm('Are you sure you want to permanently remove this ticket?')) {
-                try {
-                    await deleteDoc(doc(db, "tickets", id));
-                    if (localStorage.getItem('vexco_my_ticket_id') === id) {
-                        localStorage.removeItem('vexco_my_ticket_id');
-                    }
-                } catch (e) {
-                    console.error("Error deleting ticket: ", e);
-                }
-            }
-        };
-
-        // Real-time Firestore Listener
+        // Firestore Real-Time Queue Listener
         const q = query(collection(db, "tickets"), orderBy("createdAt", "desc"));
         onSnapshot(q, (snapshot) => {
-            let tickets = [];
+            const tickets = [];
             snapshot.forEach((docSnap) => {
                 tickets.push({ id: docSnap.id, ...docSnap.data() });
             });
-            window.latestTickets = tickets; 
+            window.latestTickets = tickets;
             renderQueue(tickets);
-        }, (error) => {
-            console.error("Error listening to Firestore:", error);
-            document.getElementById('queueList').innerHTML = '<div class="empty-queue" style="color: var(--bauer-red);">Database connection error. Verify Firestore rules and database creation.</div>';
         });
 
+        // Render Queue & Active Counters
         function renderQueue(tickets) {
-            const container = document.getElementById('queueList');
-            const myTrackerContainer = document.getElementById('myActiveTicketContainer');
+            const queueList = document.getElementById('queueList');
             const activeCountElem = document.getElementById('activeCount');
-            
-            activeCountElem.textContent = tickets.filter(t => t.status !== 'Completed' && t.status !== 'Declined' && t.status !== 'Cancelled' && t.status !== 'Missed Opportunity').length;
+            const myTicketContainer = document.getElementById('myActiveTicketContainer');
 
-            // --- RENDER CUSTOMER'S PERSONAL TRACKER ---
-            const myTicketId = localStorage.getItem('vexco_my_ticket_id');
-            const myTicket = tickets.find(t => t.id === myTicketId);
+            updateMissedCallDisplay();
 
-            if (myTicket && !isAdmin) {
-                let statusMessage = "Waiting in queue...";
-                let statusColor = "var(--text-main)";
-                let showCancelBtn = true;
-                
-                if (myTicket.status === 'Dispatched') {
-                    statusMessage = "🚀 Technician is en route to your location!";
-                    statusColor = "var(--warning-amber)";
-                } else if (myTicket.status.includes('On Break')) {
-                    statusMessage = "⚠️ Technician is currently on break. Expect a delayed response.";
-                    statusColor = "var(--warning-amber)";
-                } else if (myTicket.status.includes('Available')) {
-                    statusMessage = "ℹ️ Technician is en route from outside primary staging zone.";
-                    statusColor = "#60a5fa";
-                } else if (myTicket.status === 'Completed') {
-                    statusMessage = "✅ Service completed. Thank you for choosing Vexco!";
-                    statusColor = "var(--success-green)";
-                    showCancelBtn = false;
-                } else if (myTicket.status === 'Declined') {
-                    statusMessage = `❌ Request Closed: ${myTicket.notes || 'Service could not be fulfilled.'}`;
-                    statusColor = "var(--bauer-red)";
-                    showCancelBtn = false;
-                } else if (myTicket.status === 'Cancelled') {
-                    statusMessage = "⚠️ You have cancelled this request.";
-                    statusColor = "var(--bauer-red)";
-                    showCancelBtn = false;
-                } else if (myTicket.status === 'Missed Opportunity') {
-                    statusMessage = "📝 Missed request logged successfully. Thank you for helping us track peak hours!";
-                    statusColor = "var(--gilded-brass)";
-                    showCancelBtn = false;
-                }
-
-                myTrackerContainer.innerHTML = `
-                    <div class="my-ticket-banner">
-                        <h3>📍 Your Active Request <span>${myTicket.timestamp}</span></h3>
-                        <div class="ticket-details">
-                            <p><strong>Service:</strong> ${myTicket.service}</p>
-                            <p><strong>Vehicle:</strong> ${myTicket.vehicle}</p>
-                            <p><strong>Location:</strong> ${myTicket.location}</p>
-                            <p style="margin-top: 0.5rem;"><strong>Status:</strong> <span style="font-weight: 700; color: ${statusColor};">${statusMessage}</span></p>
-                        </div>
-                        <div style="text-align: right; margin-top: 0.5rem; display: flex; gap: 0.5rem; justify-content: flex-end;">
-                            ${showCancelBtn ? `<button class="action-btn danger" onclick="cancelMyRequest('${myTicket.id}')">Cancel Request</button>` : ''}
-                            <button class="action-btn" style="border-color: #374151; color: var(--text-muted);" onclick="localStorage.removeItem('vexco_my_ticket_id'); renderQueue(window.latestTickets);">Dismiss Tracker</button>
-                        </div>
-                    </div>
-                `;
-            } else {
-                myTrackerContainer.innerHTML = '';
-            }
+            // Filter active dispatches (Pending or Dispatched)
+            const activeTickets = tickets.filter(t => t.status && (t.status.startsWith('Pending') || t.status.startsWith('Dispatched')));
+            activeCountElem.textContent = activeTickets.length;
 
             if (tickets.length === 0) {
-                container.innerHTML = '<div class="empty-queue">No active service requests in the queue.</div>';
+                queueList.innerHTML = `<div class="empty-queue">No service requests in the queue.</div>`;
+                myTicketContainer.innerHTML = '';
                 return;
             }
 
-            container.innerHTML = '';
-            tickets.forEach(ticket => {
-                const card = document.createElement('div');
-                card.className = `ticket-card status-${ticket.status.toLowerCase().replace(/[^a-z]/g, '')}`;
-                
-                if (isAdmin) {
-                    // --- ADMIN VIEW ---
-                    const isCoordinates = /^-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?$/.test(ticket.location.trim());
-                    const mapLinkHtml = isCoordinates 
-                        ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ticket.location)}" target="_blank" class="action-btn nav-map">🗺️ Open Map</a>`
-                        : `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ticket.location + ' Hot Springs AR')}" target="_blank" class="action-btn nav-map">🗺️ Search Map</a>`;
+            // Render Customer's Personal Ticket Tracker if saved in localStorage
+            const myTicketId = localStorage.getItem('vexco_my_ticket_id');
+            let myTicketHtml = '';
+            const myTicket = tickets.find(t => t.id === myTicketId);
 
-                    card.innerHTML = `
+            if (myTicket && !isAdmin) {
+                let statusColor = 'var(--gilded-brass)';
+                if (myTicket.status.includes('Completed')) statusColor = 'var(--success-green)';
+                else if (myTicket.status.includes('Declined') || myTicket.status.includes('Cancelled')) statusColor = 'var(--bauer-red)';
+
+                myTicketHtml = `
+                    <div class="my-ticket-banner">
+                        <h3>Your Active Request Tracker <span style="color: ${statusColor};">${myTicket.status}</span></h3>
+                        <div class="ticket-details">
+                            <p><strong>Service:</strong> ${myTicket.service}</p>
+                            <p><strong>Location:</strong> ${myTicket.location}</p>
+                            <p><strong>Vehicle:</strong> ${myTicket.vehicle}</p>
+                        </div>
+                        ${(myTicket.status.startsWith('Pending')) ? `<button class="action-btn danger" onclick="cancelMyRequest('${myTicket.id}')">Cancel Request</button>` : ''}
+                    </div>
+                `;
+            }
+            myTicketContainer.innerHTML = myTicketHtml;
+
+            // Render Master Queue List
+            let html = '';
+            tickets.forEach(ticket => {
+                let statusClass = '';
+                if (ticket.status.includes('Dispatched')) statusClass = 'status-dispatched';
+                else if (ticket.status.includes('Completed')) statusClass = 'status-completed';
+                else if (ticket.status.includes('Declined')) statusClass = 'status-declined';
+                else if (ticket.status.includes('Cancelled')) statusClass = 'status-cancelled';
+                else if (ticket.status.includes('Missed')) statusClass = 'status-missed';
+
+                let mapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ticket.location)}`;
+
+                html += `
+                    <div class="ticket-card ${statusClass}">
                         <div class="ticket-header">
-                            <div class="ticket-title">${ticket.service} — <span style="color: var(--gilded-brass);">${ticket.name}</span></div>
+                            <div class="ticket-title">${ticket.name} — <span style="color: var(--gilded-brass);">${ticket.service}</span></div>
                             <div class="ticket-time">${ticket.timestamp}</div>
                         </div>
                         <div class="ticket-details">
-                            <p><strong>Phone:</strong> <a href="tel:${ticket.phone}" style="color: var(--gilded-brass-light); text-decoration: none;">${ticket.phone}</a></p>
+                            <p><strong>Phone:</strong> <a href="tel:${ticket.phone}" style="color: #60a5fa; text-decoration: none;">${ticket.phone}</a></p>
                             <p><strong>Location:</strong> ${ticket.location}</p>
                             <p><strong>Vehicle:</strong> ${ticket.vehicle}</p>
-                            ${ticket.notes ? `<p><strong>Notes/Reason:</strong> ${ticket.notes}</p>` : ''}
-                            <p><strong>Status:</strong> <span style="font-weight: 600; color: ${ticket.status === 'Completed' ? 'var(--success-green)' : ticket.status === 'Dispatched' ? 'var(--warning-amber)' : ticket.status === 'Declined' || ticket.status === 'Cancelled' ? 'var(--bauer-red)' : ticket.status === 'Missed Opportunity' ? 'var(--gilded-brass)' : 'var(--text-main)'};">${ticket.status}</span></p>
+                            ${ticket.notes ? `<p><strong>Notes:</strong> ${ticket.notes}</p>` : ''}
+                            <p><strong>Status:</strong> <span style="font-weight: 600;">${ticket.status}</span></p>
                         </div>
                         <div class="ticket-actions">
-                            ${ticket.status !== 'Missed Opportunity' ? mapLinkHtml : ''}
-                            ${ticket.status !== 'Dispatched' && ticket.status !== 'Declined' && ticket.status !== 'Cancelled' && ticket.status !== 'Completed' && ticket.status !== 'Missed Opportunity' ? `<button class="action-btn" onclick="updateStatus('${ticket.id}', 'Dispatched')">Mark Dispatched</button>` : ''}
-                            ${ticket.status !== 'Completed' && ticket.status !== 'Declined' && ticket.status !== 'Cancelled' && ticket.status !== 'Missed Opportunity' ? `<button class="action-btn" style="border-color: var(--success-green); color: var(--success-green);" onclick="updateStatus('${ticket.id}', 'Completed')">Complete</button>` : ''}
-                            ${ticket.status !== 'Declined' && ticket.status !== 'Cancelled' && ticket.status !== 'Completed' && ticket.status !== 'Missed Opportunity' ? `<button class="action-btn danger" onclick="declineTicket('${ticket.id}')">Decline / Cancel</button>` : ''}
-                            <button class="action-btn" style="border-color: #374151; color: var(--text-muted);" onclick="deleteTicket('${ticket.id}')">Delete</button>
+                            <a href="${mapsLink}" target="_blank" class="action-btn nav-map">🗺️ Open GPS Map</a>
+                            ${isAdmin ? `
+                                <button class="action-btn" onclick="updateStatus('${ticket.id}', 'Dispatched')">⚡ Set Dispatched</button>
+                                <button class="action-btn" onclick="updateStatus('${ticket.id}', 'Completed')">✅ Complete</button>
+                                <button class="action-btn danger" onclick="declineTicket('${ticket.id}')">❌ Decline</button>
+                            ` : ''}
                         </div>
-                    `;
-                } else {
-                    // --- PUBLIC VIEW ---
-                    card.innerHTML = `
-                        <div class="ticket-header">
-                            <div class="ticket-title">${ticket.service}</div>
-                            <div class="ticket-time">${ticket.timestamp}</div>
-                        </div>
-                        <div class="ticket-details">
-                            <p><strong>Status:</strong> <span style="font-weight: 600; color: ${ticket.status === 'Completed' ? 'var(--success-green)' : ticket.status === 'Dispatched' ? 'var(--warning-amber)' : ticket.status === 'Declined' || ticket.status === 'Cancelled' ? 'var(--bauer-red)' : ticket.status === 'Missed Opportunity' ? 'var(--gilded-brass)' : 'var(--text-main)'};">${ticket.status}</span></p>
-                            ${(ticket.status === 'Declined' || ticket.status === 'Cancelled') && ticket.notes ? `<p style="color: var(--bauer-red); margin-top: 0.25rem;"><strong>Details:</strong> ${ticket.notes}</p>` : ''}
-                        </div>
-                    `;
-                }
-
-                container.appendChild(card);
+                    </div>
+                `;
             });
+
+            queueList.innerHTML = html;
         }
+
+        // Background Status Reminder Timer Check (Reminds if left on Break or Available for > 30 minutes)
+        function checkStatusReminders() {
+            if (!isAdmin) return;
+            const elapsedMinutes = (Date.now() - lastStatusChangeTime) / 60000;
+            if ((currentOperationalStatus === 'On Break' || currentOperationalStatus === 'Available') && elapsedMinutes >= 30) {
+                console.warn(`Reminder: Status has been set to '${currentOperationalStatus}' for over 30 minutes.`);
+            }
+        }
+
+        // Run reminder check every minute
+        setInterval(checkStatusReminders, 60000);
     </script>
 </body>
 </html>
